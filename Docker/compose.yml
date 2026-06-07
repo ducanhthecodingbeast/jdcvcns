@@ -1,0 +1,55 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: jdcvcns
+      POSTGRES_PASSWORD: jdcvcns_dev_password
+      POSTGRES_DB: jdcvcns
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  qdrant:
+    image: qdrant/qdrant:v1.12.5
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  app:
+    build:
+      context: ..
+      dockerfile: Docker/Dockerfile
+    ports:
+      - "8899:8899"
+    volumes:
+      - ..:/app
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=jdcvcns
+      - POSTGRES_PASSWORD=jdcvcns_dev_password
+      - POSTGRES_DB=jdcvcns
+      - QDRANT_HOST=qdrant
+    depends_on:
+      - postgres
+      - qdrant
+
+  api:
+    build:
+      context: ..
+      dockerfile: Docker/Dockerfile.api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ..:/app
+    environment:
+      - DATABASE_URL=sqlite:///TestingResults/matches.db
+      - QDRANT_HOST=qdrant
+    depends_on:
+      - qdrant
+
+volumes:
+  postgres_data:
+  qdrant_data:

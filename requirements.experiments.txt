@@ -1,0 +1,8 @@
+-r requirements.api.txt
+kaggle>=1.6.17
+datasets>=2.20.0
+docling>=2.0.0
+FlagEmbedding>=1.2.11
+qdrant-client>=1.10.0
+notebook>=7.0.0
+kaggle>=7.1.0
