@@ -1,0 +1,16 @@
+{
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 500,
+  "files.watcherExclude": {
+    "**/.cache/**": true,
+    "**/__pycache__/**": true,
+    "**/TestingResults/**": true,
+    "**/tmp_bge_sample/**": true
+  },
+  "python.analysis.exclude": [
+    "**/.cache",
+    "**/__pycache__",
+    "**/TestingResults",
+    "**/tmp_bge_sample"
+  ]
+}
