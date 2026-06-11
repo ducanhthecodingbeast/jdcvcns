@@ -1,0 +1,5 @@
+.venv/
+.cache/
+TestingResults/
+__pycache__/
+*.pyc

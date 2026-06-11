@@ -1,0 +1,17 @@
+-r requirements.api.txt
+pandas
+numpy
+sentence-transformers
+torch
+tqdm
+scikit-learn
+pgvector
+requests
+PyYAML
+supabase
+kaggle
+datasets
+docling
+FlagEmbedding
+qdrant-client
+notebook
