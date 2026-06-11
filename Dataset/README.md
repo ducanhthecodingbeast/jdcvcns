@@ -11,13 +11,19 @@ Run preprocessing:
 
 ```bash
 cd Dataset
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
 export KAGGLE_USERNAME=your_username
 export KAGGLE_KEY=your_api_key
-python data_preprocessing.py
+./run.sh
+```
+
+Run in the background so it continues after closing the terminal:
+
+```bash
+cd Dataset
+export KAGGLE_USERNAME=your_username
+export KAGGLE_KEY=your_api_key
+./run.sh --background
+tail -f run.log
 ```
 
 This project does not use `~/.kaggle/kaggle.json`; Kaggle credentials are read only from `KAGGLE_USERNAME` and `KAGGLE_KEY`.

@@ -1,8 +1,8 @@
 .venv/
 .env.local
 .cache/
-run_all.log
-run_all.pid
+*.log
+*.pid
 Data
 __pycache__/
 *.pyc

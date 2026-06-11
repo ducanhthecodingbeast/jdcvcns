@@ -7,6 +7,46 @@ VENV_DIR="${SCRIPT_DIR}/.venv"
 LOCAL_ENV="${SCRIPT_DIR}/.env.local"
 DATA_DIR="${REPO_ROOT}/Data"
 CACHE_DIR="${SCRIPT_DIR}/.cache"
+LOG_FILE="${RUN_LOG:-${SCRIPT_DIR}/run.log}"
+PID_FILE="${RUN_PID:-${SCRIPT_DIR}/run.pid}"
+
+RUN_BACKGROUND=false
+if [[ "${1:-}" == "--background" || "${1:-}" == "background" || "${1:-}" == "runbackground" ]]; then
+  RUN_BACKGROUND=true
+  shift
+fi
+
+if [[ $# -gt 0 ]]; then
+  echo "Unknown argument(s): $*" >&2
+  echo "Usage: ./run.sh [--background]" >&2
+  exit 2
+fi
+
+if [[ "${RUN_BACKGROUND}" == "true" ]]; then
+  if [[ -f "${PID_FILE}" ]]; then
+    old_pid="$(cat "${PID_FILE}" 2>/dev/null || true)"
+    if [[ -n "${old_pid}" ]] && kill -0 "${old_pid}" 2>/dev/null; then
+      echo "Dataset run is already running."
+      echo "PID: ${old_pid}"
+      echo "Log: ${LOG_FILE}"
+      echo "Monitor: tail -f ${LOG_FILE}"
+      exit 0
+    fi
+  fi
+
+  mkdir -p "$(dirname "${LOG_FILE}")"
+  touch "${LOG_FILE}"
+  cd "${SCRIPT_DIR}"
+  nohup "${SCRIPT_DIR}/run.sh" >"${LOG_FILE}" 2>&1 </dev/null &
+  pid="$!"
+  echo "${pid}" >"${PID_FILE}"
+
+  echo "Started Dataset run in background."
+  echo "PID: ${pid}"
+  echo "Log: ${LOG_FILE}"
+  echo "Monitor: tail -f ${LOG_FILE}"
+  exit 0
+fi
 
 create_venv() {
   echo "Creating Dataset virtual environment: ${VENV_DIR}"
