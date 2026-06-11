@@ -24,6 +24,13 @@ docker compose up -d
 python3 bgmewdranttesting3.0.py
 ```
 
+Run fully in Docker Compose:
+
+```bash
+cd 3.0
+docker compose run --rm test
+```
+
 Core files:
 - `bgmewdranttesting3.0.py`: BGE-M3 + Qdrant test entrypoint.
 - `pipeline.py`: version-local dataset/text helpers.

@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    ports:
+      - "${POSTGRES_HOST_PORT:-15410}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-jdcvcns}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jdcvcns_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-jdcvcns}
+    volumes:
+      - postgres_data_10:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-jdcvcns} -d $${POSTGRES_DB:-jdcvcns}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  test:
+    image: python:3.11-slim
+    working_dir: /workspace/1.0
+    volumes:
+      - .:/workspace/1.0
+      - ../Data:/workspace/Data
+      - ../Dataset:/workspace/Dataset
+      - cache_10:/workspace/1.0/.cache
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-jdcvcns}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jdcvcns_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-jdcvcns}
+      STORE_DB: ${STORE_DB:-1}
+      TOP_K: ${TOP_K:-10}
+      OLLAMA_GENERATE_URL: ${OLLAMA_GENERATE_URL:-http://host.docker.internal:11434/api/generate}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3.5:9b}
+      OLLAMA_TIMEOUT_SECONDS: ${OLLAMA_TIMEOUT_SECONDS:-120}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      sh -lc "apt-get update && apt-get install -y build-essential
+      && pip install --no-cache-dir -r requirements.txt
+      && python3 dotpdtesting1.0.py"
+
+volumes:
+  postgres_data_10:
+  cache_10:

@@ -13,11 +13,26 @@ Run preprocessing:
 python3 Dataset/data_preprocessing.py
 ```
 
+Or with Docker Compose:
+
+```bash
+cd Dataset
+docker compose run --rm preprocess
+```
+
 Generate/check mock CVs:
 
 ```bash
 python3 -m Dataset.mockcv --check-only
 python3 -m Dataset.mockcv --force
+```
+
+Or with Docker Compose:
+
+```bash
+cd Dataset
+docker compose run --rm mockcv
+MOCKCV_ARGS=--force docker compose run --rm mockcv
 ```
 
 Follow-up agents should keep only data/mock/preprocessing concerns here. Version-specific test logic belongs inside `1.0`, `2.0`, or `3.0`.

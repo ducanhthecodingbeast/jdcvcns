@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    ports:
+      - "${POSTGRES_HOST_PORT:-15430}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-jdcvcns}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jdcvcns_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-jdcvcns}
+    volumes:
+      - postgres_data_30:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-jdcvcns} -d $${POSTGRES_DB:-jdcvcns}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  qdrant:
+    image: qdrant/qdrant:v1.12.5
+    ports:
+      - "${QDRANT_HOST_PORT:-16330}:6333"
+    volumes:
+      - qdrant_data_30:/qdrant/storage
+
+  test:
+    image: python:3.11-slim
+    working_dir: /workspace/3.0
+    volumes:
+      - .:/workspace/3.0
+      - ../Data:/workspace/Data
+      - cache_30:/workspace/3.0/.cache
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-jdcvcns}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jdcvcns_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-jdcvcns}
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
+      STORE_DB: ${STORE_DB:-1}
+      TOP_K: ${TOP_K:-5}
+      BGE_BATCH_SIZE: ${BGE_BATCH_SIZE:-16}
+      PREFETCH_MULTIPLIER: ${PREFETCH_MULTIPLIER:-4}
+      BGE_M3_MODEL: ${BGE_M3_MODEL:-BAAI/bge-m3}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    command: >
+      sh -lc "apt-get update && apt-get install -y build-essential
+      && pip install --no-cache-dir -r requirements.txt
+      && python3 bgmewdranttesting3.0.py"
+
+volumes:
+  postgres_data_30:
+  qdrant_data_30:
+  cache_30:

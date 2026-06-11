@@ -26,6 +26,16 @@ python3 dotpdtesting2.2.py
 python3 dotpdtesting2.3.py
 ```
 
+Run fully in Docker Compose:
+
+```bash
+cd 2.0
+docker compose run --rm test
+TEST_FILE=dotpdtesting2.1.py docker compose run --rm test
+TEST_FILE=dotpdtesting2.2.py docker compose run --rm test
+TEST_FILE=dotpdtesting2.3.py docker compose run --rm test
+```
+
 `dotpdtesting2.0.py` uploads JD embeddings to PostgreSQL/pgvector. The `2.1`, `2.2`, and `2.3` files run matching tests and store result runs.
 
 Follow-up agents can improve result export/reporting, but should keep shared runtime code version-local inside this folder.

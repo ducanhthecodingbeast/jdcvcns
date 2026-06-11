@@ -24,6 +24,13 @@ docker compose up -d
 python3 dotpdtesting1.0.py
 ```
 
+Run fully in Docker Compose:
+
+```bash
+cd 1.0
+docker compose run --rm test
+```
+
 Core files:
 - `dotpdtesting1.0.py`: version-1 test entrypoint.
 - `pipeline.py`: version-local dataset/text/embedding helpers.
