@@ -1,0 +1,4 @@
+.cache/
+TestingResults/
+__pycache__/
+*.pyc

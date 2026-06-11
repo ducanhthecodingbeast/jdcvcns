@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "8000:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - POSTGRES_HOST=host.docker.internal
+      - POSTGRES_PORT=15430
+      - POSTGRES_USER=jdcvcns
+      - POSTGRES_PASSWORD=jdcvcns_dev_password
+      - POSTGRES_DB=jdcvcns
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - VITE_API_URL=http://localhost:8000/api

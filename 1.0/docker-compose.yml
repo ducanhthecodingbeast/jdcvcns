@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    ports:
+      - "${POSTGRES_HOST_PORT:-15410}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-jdcvcns}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jdcvcns_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-jdcvcns}
+    volumes:
+      - postgres_data_10:/var/lib/postgresql/data
+
+volumes:
+  postgres_data_10:

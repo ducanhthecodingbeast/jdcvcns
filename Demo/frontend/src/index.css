@@ -1,0 +1,334 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;600&display=swap');
+
+:root {
+  /* Colors */
+  --primary: #0f62fe;
+  --on-primary: #ffffff;
+  --ink: #161616;
+  --ink-muted: #525252;
+  --ink-subtle: #8c8c8c;
+  --canvas: #ffffff;
+  --surface-1: #f4f4f4;
+  --surface-2: #e0e0e0;
+  --inverse-canvas: #161616;
+  --inverse-surface-1: #262626;
+  --inverse-ink: #ffffff;
+  --inverse-ink-muted: #c6c6c6;
+  --hairline: #e0e0e0;
+  --hairline-strong: #161616;
+  --blue-60: #0043ce;
+  --blue-80: #002d9c;
+  --blue-hover: #0050e6;
+  --semantic-success: #24a148;
+  --semantic-warning: #f1c21b;
+  --semantic-error: #da1e28;
+  --semantic-info: #0f62fe;
+
+  /* Typography Base */
+  --font-family: 'IBM Plex Sans', Helvetica Neue, Arial, sans-serif;
+  
+  /* Typography Tokens */
+  --display-xl-size: 76px;
+  --display-xl-weight: 300;
+  --display-xl-line-height: 1.17;
+  --display-xl-letter-spacing: -0.5px;
+  
+  --display-lg-size: 60px;
+  --display-lg-weight: 300;
+  --display-lg-line-height: 1.17;
+  --display-lg-letter-spacing: -0.4px;
+
+  --display-md-size: 42px;
+  --display-md-weight: 300;
+  --display-md-line-height: 1.20;
+  --display-md-letter-spacing: 0;
+
+  --headline-size: 32px;
+  --headline-weight: 400;
+  --headline-line-height: 1.25;
+  --headline-letter-spacing: 0;
+
+  --card-title-size: 24px;
+  --card-title-weight: 400;
+  --card-title-line-height: 1.33;
+  --card-title-letter-spacing: 0;
+
+  --subhead-size: 20px;
+  --subhead-weight: 400;
+  --subhead-line-height: 1.40;
+  --subhead-letter-spacing: 0;
+
+  --body-lg-size: 18px;
+  --body-lg-weight: 400;
+  --body-lg-line-height: 1.50;
+  --body-lg-letter-spacing: 0;
+
+  --body-size: 16px;
+  --body-weight: 400;
+  --body-line-height: 1.50;
+  --body-letter-spacing: 0.16px;
+
+  --body-sm-size: 14px;
+  --body-sm-weight: 400;
+  --body-sm-line-height: 1.29;
+  --body-sm-letter-spacing: 0.16px;
+
+  --body-emphasis-size: 14px;
+  --body-emphasis-weight: 600;
+  --body-emphasis-line-height: 1.29;
+  --body-emphasis-letter-spacing: 0.16px;
+
+  --caption-size: 12px;
+  --caption-weight: 400;
+  --caption-line-height: 1.33;
+  --caption-letter-spacing: 0.32px;
+
+  --button-size: 14px;
+  --button-weight: 400;
+  --button-line-height: 1.29;
+  --button-letter-spacing: 0.16px;
+
+  /* Spacing */
+  --spacing-xxs: 4px;
+  --spacing-xs: 8px;
+  --spacing-sm: 12px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-xxl: 48px;
+  --spacing-section: 96px;
+
+  /* Geometry */
+  --rounded-none: 0px;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-family);
+  font-size: var(--body-size);
+  font-weight: var(--body-weight);
+  line-height: var(--body-line-height);
+  letter-spacing: var(--body-letter-spacing);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  padding: 0;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--blue-60);
+  text-decoration: underline;
+}
+
+/* Typography Classes */
+.display-xl {
+  font-size: var(--display-xl-size);
+  font-weight: var(--display-xl-weight);
+  line-height: var(--display-xl-line-height);
+  letter-spacing: var(--display-xl-letter-spacing);
+}
+
+.display-lg {
+  font-size: var(--display-lg-size);
+  font-weight: var(--display-lg-weight);
+  line-height: var(--display-lg-line-height);
+  letter-spacing: var(--display-lg-letter-spacing);
+}
+
+.display-md {
+  font-size: var(--display-md-size);
+  font-weight: var(--display-md-weight);
+  line-height: var(--display-md-line-height);
+  letter-spacing: var(--display-md-letter-spacing);
+}
+
+.headline {
+  font-size: var(--headline-size);
+  font-weight: var(--headline-weight);
+  line-height: var(--headline-line-height);
+  letter-spacing: var(--headline-letter-spacing);
+}
+
+.card-title {
+  font-size: var(--card-title-size);
+  font-weight: var(--card-title-weight);
+  line-height: var(--card-title-line-height);
+  letter-spacing: var(--card-title-letter-spacing);
+}
+
+.subhead {
+  font-size: var(--subhead-size);
+  font-weight: var(--subhead-weight);
+  line-height: var(--subhead-line-height);
+  letter-spacing: var(--subhead-letter-spacing);
+}
+
+.body-lg {
+  font-size: var(--body-lg-size);
+  font-weight: var(--body-lg-weight);
+  line-height: var(--body-lg-line-height);
+  letter-spacing: var(--body-lg-letter-spacing);
+}
+
+.body-sm {
+  font-size: var(--body-sm-size);
+  font-weight: var(--body-sm-weight);
+  line-height: var(--body-sm-line-height);
+  letter-spacing: var(--body-sm-letter-spacing);
+}
+
+.body-emphasis {
+  font-size: var(--body-emphasis-size);
+  font-weight: var(--body-emphasis-weight);
+  line-height: var(--body-emphasis-line-height);
+  letter-spacing: var(--body-emphasis-letter-spacing);
+}
+
+.caption {
+  font-size: var(--caption-size);
+  font-weight: var(--caption-weight);
+  line-height: var(--caption-line-height);
+  letter-spacing: var(--caption-letter-spacing);
+}
+
+/* Components */
+.button-primary {
+  background-color: var(--primary);
+  color: var(--on-primary);
+  font-family: var(--font-family);
+  font-size: var(--button-size);
+  font-weight: var(--button-weight);
+  line-height: var(--button-line-height);
+  letter-spacing: var(--button-letter-spacing);
+  border-radius: var(--rounded-none);
+  padding: 12px 16px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.button-primary:hover {
+  background-color: var(--blue-hover);
+}
+.button-primary:active {
+  background-color: var(--blue-80);
+}
+
+.button-secondary {
+  background-color: var(--ink);
+  color: var(--inverse-ink);
+  font-family: var(--font-family);
+  font-size: var(--button-size);
+  font-weight: var(--button-weight);
+  line-height: var(--button-line-height);
+  letter-spacing: var(--button-letter-spacing);
+  border-radius: var(--rounded-none);
+  padding: 12px 16px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.feature-card {
+  background-color: var(--canvas);
+  color: var(--ink);
+  border-radius: var(--rounded-none);
+  padding: var(--spacing-lg);
+  border: 1px solid var(--hairline);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+.feature-card:hover {
+  background-color: var(--surface-1);
+}
+
+.feature-card-elevated {
+  background-color: var(--surface-1);
+  color: var(--ink);
+  border-radius: var(--rounded-none);
+  padding: var(--spacing-lg);
+  border: 1px solid var(--hairline);
+}
+
+.product-card {
+  background-color: var(--canvas);
+  color: var(--ink);
+  border-radius: var(--rounded-none);
+  padding: var(--spacing-xl);
+  border: 1px solid var(--hairline);
+}
+
+.hero-card {
+  background-color: var(--canvas);
+  color: var(--ink);
+  border-radius: var(--rounded-none);
+  padding: var(--spacing-xxl);
+  border: 1px solid var(--hairline);
+}
+
+.top-nav {
+  background-color: var(--canvas);
+  color: var(--ink);
+  height: 48px;
+  border-bottom: 1px solid var(--hairline);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--spacing-lg);
+}
+
+.footer {
+  background-color: var(--inverse-canvas);
+  color: var(--inverse-ink-muted);
+  padding: 64px 32px;
+}
+.footer h4 {
+  color: var(--inverse-ink);
+}
+
+.grid {
+  display: grid;
+  gap: var(--spacing-lg);
+}
+.grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+.grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+@media (max-width: 1056px) {
+  .grid-cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid-cols-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 672px) {
+  .grid-cols-4, .grid-cols-3, .grid-cols-2 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+}
+
+.badge {
+  display: inline-block;
+  padding: 4px 8px;
+  font-size: var(--caption-size);
+  font-weight: var(--caption-weight);
+  letter-spacing: var(--caption-letter-spacing);
+  background-color: var(--surface-1);
+  color: var(--ink);
+  border: 1px solid var(--hairline);
+  margin-right: 8px;
+}
+.badge-success {
+  color: var(--semantic-success);
+  border-color: var(--semantic-success);
+}
+.badge-primary {
+  color: var(--primary);
+  border-color: var(--primary);
+}

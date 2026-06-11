@@ -1,7 +1,0 @@
-Generating Mock CVs via LLM:   0%|          | 0/2 [00:00<?, ?it/s]                                                                  Generating Mock CVs via LLM:   0%|          | 0/2 [01:01<?, ?it/s]Generating Mock CVs via LLM:  50%|█████     | 1/2 [01:01<01:01, 61.52s/it]                                                                          Generating Mock CVs via LLM:  50%|█████     | 1/2 [02:03<01:01, 61.52s/it]Generating Mock CVs via LLM: 100%|██████████| 2/2 [02:03<00:00, 62.03s/it]Generating Mock CVs via LLM: 100%|██████████| 2/2 [02:03<00:00, 61.95s/it]
-[LLM Error] Failed for 'Data Analyst': Expecting value: line 1 column 1 (char 0)
-[LLM Error] Failed for 'Backend Engineer': Unterminated string starting at: line 8 column 31 (char 537)
-Enriching Real CVs via LLM:   0%|          | 0/2 [00:00<?, ?it/s]                                                                 Enriching Real CVs via LLM:   0%|          | 0/2 [01:37<?, ?it/s]Enriching Real CVs via LLM:  50%|█████     | 1/2 [01:37<01:37, 97.30s/it]                                                                         Enriching Real CVs via LLM:  50%|█████     | 1/2 [03:14<01:37, 97.30s/it]Enriching Real CVs via LLM: 100%|██████████| 2/2 [03:14<00:00, 97.24s/it]Enriching Real CVs via LLM: 100%|██████████| 2/2 [03:14<00:00, 97.25s/it]
-[LLM Error] Failed enriching CV 'Nguyen Van A': Expecting value: line 1 column 1 (char 0)
-[LLM Error] Failed enriching CV 'Tran Thi B': Expecting value: line 1 column 1 (char 0)
-Wrote 0 CVs to Dataset/mockcv.csv
