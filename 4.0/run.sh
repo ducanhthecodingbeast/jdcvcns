@@ -10,14 +10,31 @@ LOG_FILE="${RUN_LOG:-${SCRIPT_DIR}/run.log}"
 PID_FILE="${RUN_PID:-${SCRIPT_DIR}/run.pid}"
 
 RUN_BACKGROUND=false
-if [[ "${1:-}" == "--background" || "${1:-}" == "background" || "${1:-}" == "runbackground" ]]; then
-  RUN_BACKGROUND=true
-  shift
-fi
+RUN_CHECK_ONLY=false
+while [[ $# -gt 0 ]]; do
+  case "${1}" in
+    --background|background|runbackground)
+      RUN_BACKGROUND=true
+      shift
+      ;;
+    --check|check)
+      RUN_CHECK_ONLY=true
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+RUN_ARGS=("$@")
 
-if [[ $# -gt 0 ]]; then
-  echo "Unknown argument(s): $*" >&2
-  echo "Usage: ./run.sh [--background]" >&2
+if [[ "${RUN_CHECK_ONLY}" == "true" && ${#RUN_ARGS[@]} -gt 0 ]]; then
+  echo "--check does not accept runner arguments: ${RUN_ARGS[*]}" >&2
+  echo "Usage: ./run.sh [--background] [--check] [-- <virankertesting4.0.py args>]" >&2
   exit 2
 fi
 
@@ -36,7 +53,12 @@ if [[ "${RUN_BACKGROUND}" == "true" ]]; then
   mkdir -p "$(dirname "${LOG_FILE}")"
   touch "${LOG_FILE}"
   cd "${SCRIPT_DIR}"
-  nohup "${SCRIPT_DIR}/run.sh" >"${LOG_FILE}" 2>&1 </dev/null &
+  background_args=()
+  if [[ "${RUN_CHECK_ONLY}" == "true" ]]; then
+    background_args+=(--check)
+  fi
+  background_args+=("${RUN_ARGS[@]}")
+  nohup "${SCRIPT_DIR}/run.sh" "${background_args[@]}" >"${LOG_FILE}" 2>&1 </dev/null &
   pid="$!"
   echo "${pid}" >"${PID_FILE}"
 
@@ -107,7 +129,12 @@ cd "${SCRIPT_DIR}"
 "${VENV_DIR}/bin/python" -m pip install -r "${SCRIPT_DIR}/requirements.txt"
 
 if [[ -f "${REPO_ROOT}/scripts/compose" ]]; then
-  "${REPO_ROOT}/scripts/compose" up -d
+  "${REPO_ROOT}/scripts/compose" up -d postgres qdrant
 fi
 
-"${VENV_DIR}/bin/python" "${SCRIPT_DIR}/virankertesting4.0.py"
+if [[ "${RUN_CHECK_ONLY}" == "true" ]]; then
+  "${VENV_DIR}/bin/python" "${SCRIPT_DIR}/quality_check.py"
+  exit 0
+fi
+
+"${VENV_DIR}/bin/python" "${SCRIPT_DIR}/virankertesting4.0.py" "${RUN_ARGS[@]}"

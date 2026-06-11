@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import re
+import unicodedata
 from pathlib import Path
 from typing import Iterable
 
@@ -12,6 +14,7 @@ REPO_ROOT = PROJECT_ROOT.parent
 DATASET_DIR = REPO_ROOT / "Data"
 RESULTS_DIR = PROJECT_ROOT / "TestingResults"
 DEFAULT_RANDOM_STATE = 42
+WHITESPACE_RE = re.compile(r"\s+")
 
 
 CV_RENAME_MAP = {
@@ -161,9 +164,16 @@ def _row_text(row: pd.Series, fields: Iterable[tuple[str, str]]) -> str:
     parts: list[str] = []
     for column, label in fields:
         value = row.get(column)
-        if pd.notna(value) and str(value).strip():
-            parts.append(f"{label}: {value}")
+        if pd.notna(value):
+            text = clean_text(value)
+            if text:
+                parts.append(f"{label}: {text}")
     return "\n".join(parts)
+
+
+def clean_text(value: object) -> str:
+    text = unicodedata.normalize("NFC", str(value))
+    return WHITESPACE_RE.sub(" ", text).strip()
 
 
 def get_jd_text(row: pd.Series, include_company: bool = True) -> str:

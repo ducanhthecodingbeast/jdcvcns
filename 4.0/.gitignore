@@ -1,5 +1,7 @@
 .venv/
 .cache/
 TestingResults/
+*.log
+*.pid
 __pycache__/
 *.pyc

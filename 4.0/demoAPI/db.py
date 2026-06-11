@@ -24,7 +24,7 @@ def get_database_url() -> str:
         return database_url
 
     host = os.environ.get("POSTGRES_HOST", "localhost")
-    port = os.environ.get("POSTGRES_PORT", "15430")
+    port = os.environ.get("POSTGRES_PORT", "15440")
     user = os.environ.get("POSTGRES_USER", "jdcvcns")
     password = quote_plus(os.environ.get("POSTGRES_PASSWORD", "jdcvcns_dev_password"))
     database = os.environ.get("POSTGRES_DB", "jdcvcns")
