@@ -9,8 +9,16 @@ Shared exceptions:
 Prepare shared data from the repo root first:
 
 ```bash
-python3 Dataset/data_preprocessing.py
-python3 -m Dataset.mockcv --force
+cd Dataset
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+export KAGGLE_USERNAME=your_username
+export KAGGLE_KEY=your_api_key
+python data_preprocessing.py
+python -m mockcv --force
+cd ..
 ```
 
 Run:
@@ -19,9 +27,10 @@ Run:
 cd 3.0
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
 docker compose up -d
-python3 bgmewdranttesting3.0.py
+python bgmewdranttesting3.0.py
 ```
 
 Run fully in Docker Compose:

@@ -10,9 +10,14 @@ Purpose:
 Run preprocessing:
 
 ```bash
+cd Dataset
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
 export KAGGLE_USERNAME=your_username
 export KAGGLE_KEY=your_api_key
-python3 Dataset/data_preprocessing.py
+python data_preprocessing.py
 ```
 
 This project does not use `~/.kaggle/kaggle.json`; Kaggle credentials are read only from `KAGGLE_USERNAME` and `KAGGLE_KEY`.
@@ -27,8 +32,10 @@ docker compose run --rm preprocess
 Generate/check mock CVs:
 
 ```bash
-python3 -m Dataset.mockcv --check-only
-python3 -m Dataset.mockcv --force
+cd Dataset
+source .venv/bin/activate
+python -m mockcv --check-only
+python -m mockcv --force
 ```
 
 Or with Docker Compose:
@@ -51,9 +58,10 @@ docker compose version
 
 Do not use the old Python `docker-compose` package. If you see `Not supported URL scheme http+docker`, remove or bypass the old Python Compose package and run commands with `docker compose` instead of `docker-compose`.
 
-If your Python environment has old Docker packages, upgrade to the latest packages without pinning versions:
+If your Python environment has old Docker packages, use this folder's virtual environment and upgrade to the latest packages without pinning versions:
 
 ```bash
-python3 -m pip uninstall docker-compose
-python3 -m pip install --upgrade docker requests
+source .venv/bin/activate
+python -m pip uninstall docker-compose
+python -m pip install --upgrade docker requests
 ```
