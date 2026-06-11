@@ -1,6 +1,29 @@
 services:
+  all:
+    image: python:slim
+    working_dir: /workspace
+    volumes:
+      - ..:/workspace
+      - dataset_cache:/workspace/.cache
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      KAGGLE_USERNAME: ${KAGGLE_USERNAME:-}
+      KAGGLE_KEY: ${KAGGLE_KEY:-}
+      HF_HOME: /workspace/.cache/huggingface
+      SENTENCE_TRANSFORMERS_HOME: /workspace/.cache/sentence-transformers
+      OLLAMA_GENERATE_URL: ${OLLAMA_GENERATE_URL:-http://host.docker.internal:11434/api/generate}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3.5:9b}
+      OLLAMA_TIMEOUT_SECONDS: ${OLLAMA_TIMEOUT_SECONDS:-120}
+      MOCKCV_ARGS: ${MOCKCV_ARGS:---force}
+    command: >
+      sh -lc "pip install --no-cache-dir -r Dataset/requirements.txt
+      && python Dataset/data_preprocessing.py
+      && python -m Dataset.mockcv $${MOCKCV_ARGS}"
+
   preprocess:
-    image: python:3.11-slim
+    profiles: ["manual"]
+    image: python:slim
     working_dir: /workspace
     volumes:
       - ..:/workspace
@@ -12,10 +35,11 @@ services:
       SENTENCE_TRANSFORMERS_HOME: /workspace/.cache/sentence-transformers
     command: >
       sh -lc "pip install --no-cache-dir -r Dataset/requirements.txt
-      && python3 Dataset/data_preprocessing.py"
+      && python Dataset/data_preprocessing.py"
 
   mockcv:
-    image: python:3.11-slim
+    profiles: ["manual"]
+    image: python:slim
     working_dir: /workspace
     volumes:
       - ..:/workspace
@@ -29,7 +53,7 @@ services:
       MOCKCV_ARGS: ${MOCKCV_ARGS:---check-only}
     command: >
       sh -lc "pip install --no-cache-dir -r Dataset/requirements.txt
-      && python3 -m Dataset.mockcv $${MOCKCV_ARGS}"
+      && python -m Dataset.mockcv $${MOCKCV_ARGS}"
 
 volumes:
   dataset_cache:

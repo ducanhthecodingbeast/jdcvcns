@@ -26,7 +26,9 @@ Or with Docker Compose:
 
 ```bash
 cd Dataset
-../scripts/compose run --rm preprocess
+export KAGGLE_USERNAME=your_username
+export KAGGLE_KEY=your_api_key
+../scripts/compose run --rm all
 ```
 
 Generate/check mock CVs:
@@ -42,6 +44,7 @@ Or with Docker Compose:
 
 ```bash
 cd Dataset
+../scripts/compose run --rm preprocess
 ../scripts/compose run --rm mockcv
 MOCKCV_ARGS=--force ../scripts/compose run --rm mockcv
 ```
