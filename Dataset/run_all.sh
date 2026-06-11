@@ -6,6 +6,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 VENV_DIR="${SCRIPT_DIR}/.venv"
 LOCAL_ENV="${SCRIPT_DIR}/.env.local"
 DATA_DIR="${REPO_ROOT}/Data"
+CACHE_DIR="${SCRIPT_DIR}/.cache"
 
 create_venv() {
   echo "Creating Dataset virtual environment: ${VENV_DIR}"
@@ -66,6 +67,9 @@ if [[ -z "${KAGGLE_USERNAME:-}" || -z "${KAGGLE_KEY:-}" ]]; then
 fi
 
 mkdir -p "${DATA_DIR}"
+mkdir -p "${CACHE_DIR}/huggingface" "${CACHE_DIR}/sentence-transformers"
+export HF_HOME="${HF_HOME:-${CACHE_DIR}/huggingface}"
+export SENTENCE_TRANSFORMERS_HOME="${SENTENCE_TRANSFORMERS_HOME:-${CACHE_DIR}/sentence-transformers}"
 
 cd "${REPO_ROOT}"
 

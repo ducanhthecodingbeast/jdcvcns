@@ -10,6 +10,7 @@ import pandas as pd
 from tqdm import tqdm
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+DATASET_DIR = Path(__file__).resolve().parent
 DATA_DIR = REPO_ROOT / "Data"
 
 CV_RENAME_MAP = {
@@ -56,8 +57,9 @@ HF_RESUME_DATASET = "lhoestq/resumes-raw-pdf-for-ocr"
 
 
 def configure_cache() -> None:
-    os.environ.setdefault("HF_HOME", str(REPO_ROOT / ".cache" / "huggingface"))
-    os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", str(REPO_ROOT / ".cache" / "sentence-transformers"))
+    cache_dir = DATASET_DIR / ".cache"
+    os.environ.setdefault("HF_HOME", str(cache_dir / "huggingface"))
+    os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", str(cache_dir / "sentence-transformers"))
     Path(os.environ["HF_HOME"]).mkdir(parents=True, exist_ok=True)
     Path(os.environ["SENTENCE_TRANSFORMERS_HOME"]).mkdir(parents=True, exist_ok=True)
 
