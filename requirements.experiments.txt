@@ -5,4 +5,3 @@ docling>=2.0.0
 FlagEmbedding>=1.2.11
 qdrant-client>=1.10.0
 notebook>=7.0.0
-kaggle>=7.1.0

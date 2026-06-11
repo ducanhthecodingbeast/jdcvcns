@@ -2,7 +2,7 @@ services:
   postgres:
     image: pgvector/pgvector:pg17
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT:-15432}:5432"
     environment:
       POSTGRES_USER: jdcvcns
       POSTGRES_PASSWORD: jdcvcns_dev_password
@@ -13,7 +13,7 @@ services:
   qdrant:
     image: qdrant/qdrant:v1.12.5
     ports:
-      - "6333:6333"
+      - "${QDRANT_HOST_PORT:-16333}:6333"
     volumes:
       - qdrant_data:/qdrant/storage
 
@@ -22,7 +22,7 @@ services:
       context: ..
       dockerfile: Docker/Dockerfile
     ports:
-      - "8899:8899"
+      - "${JUPYTER_HOST_PORT:-18899}:8899"
     volumes:
       - ..:/app
     environment:
@@ -47,7 +47,7 @@ services:
       context: ..
       dockerfile: Docker/Dockerfile.api
     ports:
-      - "8000:8000"
+      - "${API_HOST_PORT:-18000}:8000"
     volumes:
       - ..:/app
     environment:

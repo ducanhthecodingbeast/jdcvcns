@@ -5,11 +5,11 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
-COPY requirements.txt requirements.api.txt requirements.experiments.txt ./
+COPY JobCV-matching_CNS/requirements.txt JobCV-matching_CNS/requirements.api.txt JobCV-matching_CNS/requirements.experiments.txt ./
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY JobCV-matching_CNS/ ./
 
 EXPOSE 8899
 

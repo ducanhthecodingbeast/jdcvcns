@@ -29,7 +29,7 @@ def generate_with_local_llm(
 
 
 def build_mock_cv_prompt(title, jd_context):
-    return f"""Bạn là một chuyên gia nhân sự. Hãy tạo danh sách 20 CV tiếng Việt giả định cho nhóm vị trí liên quan đến: '{title}'.
+    return f"""Bạn là một chuyên gia nhân sự. Hãy tạo danh sách 20 CV tiếng Việt giả định cho nhóm vị trí liên quan đến: '{title}'. Không cần nhất thiết phải trùng khớp với {title}
 {jd_context}
 
 VÍ DỤ CV ĐÚNG CHUẨN:

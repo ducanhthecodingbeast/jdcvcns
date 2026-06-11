@@ -1,8 +1,8 @@
 services:
   postgres:
-    image: postgres:17-alpine
+    image: pgvector/pgvector:pg17
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT:-15432}:5432"
     environment:
       POSTGRES_USER: jdcvcns
       POSTGRES_PASSWORD: jdcvcns_dev_password
@@ -13,7 +13,7 @@ services:
   qdrant:
     image: qdrant/qdrant:v1.12.5
     ports:
-      - "6333:6333"
+      - "${QDRANT_HOST_PORT:-16333}:6333"
     volumes:
       - qdrant_data:/qdrant/storage
 
@@ -22,9 +22,9 @@ services:
       context: ..
       dockerfile: Docker/Dockerfile
     ports:
-      - "8899:8899"
+      - "${JUPYTER_HOST_PORT:-18899}:8899"
     volumes:
-      - ..:/app
+      - ../JobCV-matching_CNS:/app
     environment:
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
@@ -32,6 +32,12 @@ services:
       - POSTGRES_PASSWORD=jdcvcns_dev_password
       - POSTGRES_DB=jdcvcns
       - QDRANT_HOST=qdrant
+      - KAGGLE_USERNAME=${KAGGLE_USERNAME:-}
+      - KAGGLE_KEY=${KAGGLE_KEY:-}
+      - STORE_DB=${STORE_DB:-1}
+      - TOP_K=${TOP_K:-10}
+      - HF_HOME=${HF_HOME:-.cache/huggingface}
+      - SENTENCE_TRANSFORMERS_HOME=${SENTENCE_TRANSFORMERS_HOME:-.cache/sentence-transformers}
     depends_on:
       - postgres
       - qdrant
@@ -41,13 +47,14 @@ services:
       context: ..
       dockerfile: Docker/Dockerfile.api
     ports:
-      - "8000:8000"
+      - "${API_HOST_PORT:-18000}:8000"
     volumes:
-      - ..:/app
+      - ../JobCV-matching_CNS:/app
     environment:
-      - DATABASE_URL=sqlite:///TestingResults/matches.db
+      - DATABASE_URL=postgresql://jdcvcns:jdcvcns_dev_password@postgres:5432/jdcvcns
       - QDRANT_HOST=qdrant
     depends_on:
+      - postgres
       - qdrant
 
 volumes:
