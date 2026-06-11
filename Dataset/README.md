@@ -10,8 +10,12 @@ Purpose:
 Run preprocessing:
 
 ```bash
+export KAGGLE_USERNAME=thecapybaracoder
+export KAGGLE_API_TOKEN=KGAT_040b5e85a3503e30560d5a05ab5039b3
 python3 Dataset/data_preprocessing.py
 ```
+
+This project does not use `~/.kaggle/kaggle.json`; Kaggle credentials are read only from `KAGGLE_USERNAME` and `KAGGLE_KEY`.
 
 Or with Docker Compose:
 

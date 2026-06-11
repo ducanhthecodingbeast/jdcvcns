@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 import subprocess
 import sys
@@ -77,27 +76,17 @@ def extract_pdf_with_docling(pdf_path: str | Path) -> str:
     return result.document.export_to_csv()
 
 
-def setup_kaggle(non_interactive: bool = True) -> bool:
-    kaggle_json = Path.home() / ".kaggle" / "kaggle.json"
-    if kaggle_json.exists():
-        return True
-
+def ensure_kaggle_credentials() -> None:
     username = os.environ.get("KAGGLE_USERNAME", "").strip()
     key = os.environ.get("KAGGLE_KEY", "").strip()
     if not username or not key:
-        if non_interactive:
-            raise RuntimeError("KAGGLE_USERNAME and KAGGLE_KEY are required.")
-        username = input("Kaggle Username: ").strip()
-        key = input("Kaggle API Key: ").strip()
+        raise RuntimeError(
+            "KAGGLE_USERNAME and KAGGLE_KEY environment variables are required. "
+            "This project does not read or write kaggle.json."
+        )
 
-    if not username or not key:
-        return False
-
-    kaggle_json.parent.mkdir(parents=True, exist_ok=True)
-    kaggle_json.write_text(json.dumps({"username": username, "key": key}), encoding="utf-8")
-    if os.name == "posix":
-        kaggle_json.chmod(0o600)
-    return True
+    os.environ["KAGGLE_USERNAME"] = username
+    os.environ["KAGGLE_KEY"] = key
 
 
 def download_and_extract(target_dir: str | Path | None = None) -> None:
@@ -148,8 +137,8 @@ def download_and_extract(target_dir: str | Path | None = None) -> None:
 def main() -> None:
     configure_cache()
     print(f"Kaggle dataset: {KAGGLE_DATASET_URL}")
-    if setup_kaggle(non_interactive=True):
-        download_and_extract()
+    ensure_kaggle_credentials()
+    download_and_extract()
 
 
 if __name__ == "__main__":
