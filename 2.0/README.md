@@ -29,7 +29,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
-docker compose up -d
+../scripts/compose up -d
 python dotpdtesting2.1.py
 python dotpdtesting2.2.py
 python dotpdtesting2.3.py
@@ -39,10 +39,10 @@ Run fully in Docker Compose:
 
 ```bash
 cd 2.0
-docker compose run --rm test
-TEST_FILE=dotpdtesting2.1.py docker compose run --rm test
-TEST_FILE=dotpdtesting2.2.py docker compose run --rm test
-TEST_FILE=dotpdtesting2.3.py docker compose run --rm test
+../scripts/compose run --rm test
+TEST_FILE=dotpdtesting2.1.py ../scripts/compose run --rm test
+TEST_FILE=dotpdtesting2.2.py ../scripts/compose run --rm test
+TEST_FILE=dotpdtesting2.3.py ../scripts/compose run --rm test
 ```
 
 `dotpdtesting2.0.py` uploads JD embeddings to PostgreSQL/pgvector. The `2.1`, `2.2`, and `2.3` files run matching tests and store result runs.

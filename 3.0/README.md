@@ -29,7 +29,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
-docker compose up -d
+../scripts/compose up -d
 python bgmewdranttesting3.0.py
 ```
 
@@ -37,7 +37,7 @@ Run fully in Docker Compose:
 
 ```bash
 cd 3.0
-docker compose run --rm test
+../scripts/compose run --rm test
 ```
 
 Core files:

@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+set -eu
+
+if ! docker compose version >/dev/null 2>&1; then
+  echo "Docker Compose V2 is required. Use 'docker compose', not the old 'docker-compose' Python command." >&2
+  exit 1
+fi
+
+exec docker compose "$@"

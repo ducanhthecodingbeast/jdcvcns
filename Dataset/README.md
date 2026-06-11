@@ -26,7 +26,7 @@ Or with Docker Compose:
 
 ```bash
 cd Dataset
-docker compose run --rm preprocess
+../scripts/compose run --rm preprocess
 ```
 
 Generate/check mock CVs:
@@ -42,8 +42,8 @@ Or with Docker Compose:
 
 ```bash
 cd Dataset
-docker compose run --rm mockcv
-MOCKCV_ARGS=--force docker compose run --rm mockcv
+../scripts/compose run --rm mockcv
+MOCKCV_ARGS=--force ../scripts/compose run --rm mockcv
 ```
 
 Follow-up agents should keep only data/mock/preprocessing concerns here. Version-specific test logic belongs inside `1.0`, `2.0`, or `3.0`.
@@ -53,10 +53,10 @@ Docker Compose note:
 Use Docker Compose V2:
 
 ```bash
-docker compose version
+../scripts/compose version
 ```
 
-Do not use the old Python `docker-compose` package. If you see `Not supported URL scheme http+docker`, remove or bypass the old Python Compose package and run commands with `docker compose` instead of `docker-compose`.
+Do not use the old Python `docker-compose` package. If you see `Not supported URL scheme http+docker`, remove or bypass the old Python Compose package and run commands with `../scripts/compose` instead of `docker-compose`.
 
 If your Python environment has old Docker packages, use this folder's virtual environment and upgrade to the latest packages without pinning versions:
 
