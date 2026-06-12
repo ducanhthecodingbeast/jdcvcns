@@ -11,6 +11,8 @@ PID_FILE="${RUN_PID:-${SCRIPT_DIR}/run.pid}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 VARIANT="${RUN_VARIANT:-6.2}"
 ENV_BM25_REGEX_TOKENIZER="${BM25_REGEX_TOKENIZER:-}"
+ENV_HF_HOME="${HF_HOME:-}"
+ENV_SENTENCE_TRANSFORMERS_HOME="${SENTENCE_TRANSFORMERS_HOME:-}"
 
 RUN_BACKGROUND=false
 while [[ $# -gt 0 ]]; do
@@ -96,6 +98,34 @@ PY
   rm -f "${get_pip}"
 }
 
+choose_cache_dir() {
+  local version_name
+  local fallback_dir
+  local tmp_dir
+
+  version_name="$(basename "${SCRIPT_DIR}")"
+  fallback_dir="${XDG_CACHE_HOME:-${HOME}/.cache}/jdcvcns/${version_name}"
+  tmp_dir="${TMPDIR:-/tmp}/jdcvcns-cache-${USER:-user}/${version_name}"
+
+  if mkdir -p "${CACHE_DIR}" 2>/dev/null && [[ -w "${CACHE_DIR}" ]]; then
+    printf '%s\n' "${CACHE_DIR}"
+    return
+  fi
+
+  if mkdir -p "${fallback_dir}" 2>/dev/null && [[ -w "${fallback_dir}" ]]; then
+    echo "Project cache is not writable; using ${fallback_dir}" >&2
+    printf '%s\n' "${fallback_dir}"
+    return
+  fi
+
+  mkdir -p "${tmp_dir}" || {
+    echo "Could not create a writable cache directory." >&2
+    exit 1
+  }
+  echo "Project and home caches are not writable; using ${tmp_dir}" >&2
+  printf '%s\n' "${tmp_dir}"
+}
+
 run_variant() {
   local variant="$1"
   local script
@@ -129,6 +159,8 @@ if [[ -f "${LOCAL_ENV}" ]]; then
 fi
 
 export BM25_REGEX_TOKENIZER="${ENV_BM25_REGEX_TOKENIZER:-1}"
+export PYTHONDONTWRITEBYTECODE="${PYTHONDONTWRITEBYTECODE:-1}"
+RUNTIME_CACHE_DIR="$(choose_cache_dir)"
 
 if [[ ! -x "${VENV_DIR}/bin/python" ]]; then
   create_venv
@@ -138,9 +170,9 @@ if ! "${VENV_DIR}/bin/python" -m pip --version >/dev/null 2>&1; then
   bootstrap_pip
 fi
 
-mkdir -p "${CACHE_DIR}/huggingface" "${CACHE_DIR}/sentence-transformers"
-export HF_HOME="${HF_HOME:-${CACHE_DIR}/huggingface}"
-export SENTENCE_TRANSFORMERS_HOME="${SENTENCE_TRANSFORMERS_HOME:-${CACHE_DIR}/sentence-transformers}"
+mkdir -p "${RUNTIME_CACHE_DIR}/huggingface" "${RUNTIME_CACHE_DIR}/sentence-transformers"
+export HF_HOME="${ENV_HF_HOME:-${RUNTIME_CACHE_DIR}/huggingface}"
+export SENTENCE_TRANSFORMERS_HOME="${ENV_SENTENCE_TRANSFORMERS_HOME:-${RUNTIME_CACHE_DIR}/sentence-transformers}"
 
 cd "${SCRIPT_DIR}"
 
