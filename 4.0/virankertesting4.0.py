@@ -151,6 +151,41 @@ def require_qdrant():
     return QdrantClient, models
 
 
+def configure_torch_runtime() -> None:
+    try:
+        import torch
+    except ImportError:
+        return
+
+    cpu_threads = os.environ.get("CPU_THREADS") or os.environ.get("OMP_NUM_THREADS")
+    if cpu_threads:
+        try:
+            torch.set_num_threads(max(1, int(cpu_threads)))
+        except (RuntimeError, ValueError):
+            pass
+
+    try:
+        torch.set_float32_matmul_precision("high")
+    except (AttributeError, RuntimeError):
+        pass
+
+    if not torch.cuda.is_available():
+        return
+
+    try:
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
+    except AttributeError:
+        pass
+
+    fraction = os.environ.get("GPU_MEMORY_FRACTION", "").strip()
+    if fraction:
+        try:
+            torch.cuda.set_per_process_memory_fraction(min(1.0, max(0.01, float(fraction))))
+        except (RuntimeError, ValueError):
+            pass
+
+
 def json_safe(value: Any) -> Any:
     if value is None:
         return None
@@ -476,6 +511,7 @@ def run_bgem3_qdrant(config: Config) -> dict[str, Any]:
     started_monotonic = time.monotonic()
     _, models = require_qdrant()
     BGEM3FlagModel = require_bgem3_model()
+    configure_torch_runtime()
 
     print("Loading datasets...")
     df_cv, df_jd = load_datasets(config.dataset_dir)

@@ -80,6 +80,41 @@ def env_optional_int(name: str) -> int | None:
     return None if not value else int(value)
 
 
+def configure_torch_runtime() -> None:
+    try:
+        import torch
+    except ImportError:
+        return
+
+    cpu_threads = os.environ.get("CPU_THREADS") or os.environ.get("OMP_NUM_THREADS")
+    if cpu_threads:
+        try:
+            torch.set_num_threads(max(1, int(cpu_threads)))
+        except (RuntimeError, ValueError):
+            pass
+
+    try:
+        torch.set_float32_matmul_precision("high")
+    except (AttributeError, RuntimeError):
+        pass
+
+    if not torch.cuda.is_available():
+        return
+
+    try:
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
+    except AttributeError:
+        pass
+
+    fraction = os.environ.get("GPU_MEMORY_FRACTION", "").strip()
+    if fraction:
+        try:
+            torch.cuda.set_per_process_memory_fraction(min(1.0, max(0.01, float(fraction))))
+        except (RuntimeError, ValueError):
+            pass
+
+
 def parse_args(run_name: str, algorithm: str) -> Config:
     parser = argparse.ArgumentParser(
         description=f"Run {run_name} CV/JD matching with algorithm={algorithm}."
@@ -218,8 +253,8 @@ class TransformerMeanPoolingEncoder:
 
 
 def load_embedding_model(config: Config) -> TransformerMeanPoolingEncoder:
+    configure_torch_runtime()
     import torch
-
     try:
         return TransformerMeanPoolingEncoder(config.model_name, config.max_length)
     except RuntimeError as exc:
