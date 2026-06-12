@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    ports:
+      - "${POSTGRES_HOST_PORT:-15600}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-jdcvcns}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jdcvcns_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-jdcvcns}
+    volumes:
+      - postgres_data_60:/var/lib/postgresql/data
+
+  test:
+    image: python:3.11-slim
+    working_dir: /workspace/6.0
+    volumes:
+      - .:/workspace/6.0
+      - ../Data:/workspace/Data
+      - cache_60:/workspace/6.0/.cache
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-jdcvcns}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jdcvcns_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-jdcvcns}
+      STORE_DB: ${STORE_DB:-1}
+      TOP_K: ${TOP_K:-10}
+      JOBBERT_MODEL: ${JOBBERT_MODEL:-TechWolf/JobBERT-v2}
+      JOBBERT_BATCH_SIZE: ${JOBBERT_BATCH_SIZE:-16}
+      JOBBERT_MAX_LENGTH: ${JOBBERT_MAX_LENGTH:-512}
+      SCORE_BATCH_SIZE: ${SCORE_BATCH_SIZE:-128}
+      CV_LIMIT: ${CV_LIMIT:-}
+      JD_LIMIT: ${JD_LIMIT:-}
+      RANDOM_STATE: ${RANDOM_STATE:-42}
+      BM25_K1: ${BM25_K1:-1.5}
+      BM25_B: ${BM25_B:-0.75}
+      BM25_REGEX_TOKENIZER: ${BM25_REGEX_TOKENIZER:-0}
+      WRITE_RESULTS: ${WRITE_RESULTS:-1}
+    depends_on:
+      postgres:
+        condition: service_started
+    command: >
+      sh -lc "apt-get update && apt-get install -y build-essential
+      && pip install --no-cache-dir -r requirements.txt
+      && python3 jobberttesting6.0.py
+      && python3 jobberttesting6.1.py
+      && python3 bm25testing6.2.py"
+
+volumes:
+  postgres_data_60:
+  cache_60:

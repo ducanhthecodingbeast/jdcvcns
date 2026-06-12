@@ -135,21 +135,21 @@ a:hover {
 
 /* Typography Classes */
 .display-xl {
-  font-size: var(--display-xl-size);
+  font-size: clamp(48px, 6vw, var(--display-xl-size));
   font-weight: var(--display-xl-weight);
   line-height: var(--display-xl-line-height);
   letter-spacing: var(--display-xl-letter-spacing);
 }
 
 .display-lg {
-  font-size: var(--display-lg-size);
+  font-size: clamp(40px, 5vw, var(--display-lg-size));
   font-weight: var(--display-lg-weight);
   line-height: var(--display-lg-line-height);
   letter-spacing: var(--display-lg-letter-spacing);
 }
 
 .display-md {
-  font-size: var(--display-md-size);
+  font-size: clamp(30px, 4vw, var(--display-md-size));
   font-weight: var(--display-md-weight);
   line-height: var(--display-md-line-height);
   letter-spacing: var(--display-md-letter-spacing);
@@ -241,6 +241,43 @@ a:hover {
   transition: background-color 0.15s ease;
 }
 
+.button-tertiary {
+  background-color: var(--canvas);
+  color: var(--primary);
+  font-family: var(--font-family);
+  font-size: var(--button-size);
+  font-weight: var(--button-weight);
+  line-height: var(--button-line-height);
+  letter-spacing: var(--button-letter-spacing);
+  border-radius: var(--rounded-none);
+  padding: 11px 15px; /* Adjust for border to keep 12x16 size */
+  border: 1px solid var(--primary);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.button-tertiary:hover {
+  background-color: var(--primary);
+  color: var(--on-primary);
+}
+
+.button-ghost {
+  background-color: transparent;
+  color: var(--primary);
+  font-family: var(--font-family);
+  font-size: var(--button-size);
+  font-weight: var(--button-weight);
+  line-height: var(--button-line-height);
+  letter-spacing: var(--button-letter-spacing);
+  border-radius: var(--rounded-none);
+  padding: 12px 16px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.button-ghost:hover {
+  background-color: var(--surface-1);
+}
+
 .feature-card {
   background-color: var(--canvas);
   color: var(--ink);
@@ -285,6 +322,10 @@ a:hover {
   display: flex;
   align-items: center;
   padding: 0 var(--spacing-lg);
+  gap: var(--spacing-lg);
+}
+.top-nav a {
+  color: var(--ink);
 }
 
 .footer {
@@ -331,4 +372,214 @@ a:hover {
 .badge-primary {
   color: var(--primary);
   border-color: var(--primary);
+}
+
+.utility-bar {
+  background-color: var(--surface-1);
+  color: var(--ink-muted);
+  height: 32px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--spacing-lg);
+}
+
+.nav-title {
+  margin-right: var(--spacing-xl);
+}
+
+.dashboard-section {
+  background-color: var(--canvas);
+  padding: var(--spacing-xxl) var(--spacing-lg);
+}
+
+.dashboard-section-alt {
+  background-color: var(--surface-1);
+}
+
+.content-shell {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--spacing-xl);
+  align-items: flex-start;
+  margin-bottom: var(--spacing-xl);
+}
+
+.section-header.compact {
+  align-items: center;
+}
+
+.summary-note {
+  max-width: 360px;
+  border-left: 4px solid var(--primary);
+  padding-left: var(--spacing-md);
+}
+
+.alert-banner {
+  border: 1px solid var(--semantic-error);
+  color: var(--semantic-error);
+  background: #fff1f1;
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.muted {
+  color: var(--ink-muted);
+}
+
+.result-source-card {
+  min-height: 310px;
+}
+
+.card-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  align-items: flex-start;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-md);
+  margin: var(--spacing-lg) 0;
+}
+
+.metric-grid.narrow {
+  min-width: 260px;
+  margin: 0;
+}
+
+.metric-grid div {
+  border-top: 1px solid var(--hairline);
+  padding-top: var(--spacing-xs);
+}
+
+.metric-grid span {
+  display: block;
+  color: var(--ink-muted);
+  margin-bottom: var(--spacing-xxs);
+}
+
+.metric-grid strong {
+  display: block;
+  font-size: var(--body-lg-size);
+  line-height: var(--body-lg-line-height);
+}
+
+.proposal-text {
+  color: var(--ink);
+  min-height: 60px;
+}
+
+.version-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  justify-content: flex-end;
+}
+
+.run-table {
+  border: 1px solid var(--hairline);
+  background: var(--canvas);
+}
+
+.run-table-head,
+.run-table-row {
+  display: grid;
+  grid-template-columns: 0.7fr 1.35fr 1.6fr 1fr 0.8fr 0.7fr;
+  gap: var(--spacing-md);
+  align-items: center;
+  padding: var(--spacing-md);
+}
+
+.run-table-head {
+  background: var(--ink);
+  color: var(--inverse-ink);
+  font-size: var(--caption-size);
+  line-height: var(--caption-line-height);
+  letter-spacing: var(--caption-letter-spacing);
+  text-transform: uppercase;
+}
+
+.run-table-row {
+  border-top: 1px solid var(--hairline);
+}
+
+.run-table-row small {
+  display: block;
+  color: var(--ink-muted);
+  margin-top: var(--spacing-xxs);
+  overflow-wrap: anywhere;
+}
+
+.empty-state {
+  border: 1px solid var(--hairline);
+  background: var(--canvas);
+  padding: var(--spacing-xl);
+}
+
+.back-button {
+  padding-left: 0;
+  margin-bottom: var(--spacing-lg);
+}
+
+.detail-list {
+  gap: var(--spacing-xl);
+}
+
+.detail-text {
+  margin: var(--spacing-sm) 0 var(--spacing-lg);
+}
+
+.match-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+}
+
+.match-card {
+  min-width: 0;
+}
+
+.match-card h4 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.clamp-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-top: var(--spacing-xs);
+}
+
+@media (max-width: 900px) {
+  .section-header,
+  .section-header.compact {
+    flex-direction: column;
+  }
+
+  .run-table-head {
+    display: none;
+  }
+
+  .run-table-row {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-xs);
+  }
+
+  .match-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .metric-grid.narrow {
+    width: 100%;
+  }
 }

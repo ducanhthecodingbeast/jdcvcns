@@ -1,1 +1,21 @@
--r requirements.experiments.txt
+fastapi
+uvicorn[standard]
+pydantic
+psycopg2-binary
+python-dotenv
+pandas
+numpy
+sentence-transformers
+torch
+tqdm
+scikit-learn
+pgvector
+requests
+PyYAML
+supabase
+kaggle
+datasets
+docling
+FlagEmbedding
+qdrant-client
+notebook

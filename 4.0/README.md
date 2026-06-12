@@ -31,7 +31,6 @@ Run:
 
 ```bash
 cd 4.0
-./run.sh --check
 ./run.sh
 ```
 
@@ -51,7 +50,6 @@ cd 4.0
 
 Core files:
 - `virankertesting4.0.py`: BGE-M3 + Qdrant + ViRanker test entrypoint.
-- `quality_check.py`: lightweight harness for data, dependency, PostgreSQL, and Qdrant readiness.
 - `pipeline.py`: version-local dataset/text helpers.
 - `testingresult.py`, `demoAPI/`: version-local PostgreSQL result storage.
 

@@ -1,6 +1,8 @@
 .venv/
 .cache/
 TestingResults/
+.env
+.env.local
 *.log
 *.pid
 __pycache__/

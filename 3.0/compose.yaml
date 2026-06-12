@@ -9,11 +9,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-jdcvcns}
     volumes:
       - postgres_data_30:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-jdcvcns} -d $${POSTGRES_DB:-jdcvcns}"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
 
   qdrant:
     image: qdrant/qdrant:v1.12.5
@@ -44,7 +39,7 @@ services:
       BGE_M3_MODEL: ${BGE_M3_MODEL:-BAAI/bge-m3}
     depends_on:
       postgres:
-        condition: service_healthy
+        condition: service_started
       qdrant:
         condition: service_started
     command: >

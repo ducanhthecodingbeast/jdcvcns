@@ -9,11 +9,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-jdcvcns}
     volumes:
       - postgres_data_20:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-jdcvcns} -d $${POSTGRES_DB:-jdcvcns}"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
 
   test:
     image: python:3.11-slim
@@ -33,8 +28,7 @@ services:
       TOP_K: ${TOP_K:-10}
       TEST_FILE: ${TEST_FILE:-dotpdtesting2.3.py}
     depends_on:
-      postgres:
-        condition: service_healthy
+      - postgres
     command: >
       sh -lc "apt-get update && apt-get install -y build-essential
       && pip install --no-cache-dir -r requirements.txt

@@ -13,7 +13,9 @@ except ImportError:  # pragma: no cover - dotenv is optional at import time
 
 
 if load_dotenv:
-    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+    env_dir = Path(__file__).resolve().parent.parent
+    load_dotenv(env_dir / ".env")
+    load_dotenv(env_dir / ".env.local", override=True)
 
 
 def get_database_url() -> str:

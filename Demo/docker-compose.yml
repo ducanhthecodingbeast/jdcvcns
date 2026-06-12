@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     build:
@@ -11,6 +9,9 @@ services:
     environment:
       - POSTGRES_HOST=host.docker.internal
       - POSTGRES_PORT=15430
+      - DEMO_POSTGRES_30_PORT=15430
+      - DEMO_POSTGRES_40_PORT=15440
+      - DEMO_POSTGRES_60_PORT=15600
       - POSTGRES_USER=jdcvcns
       - POSTGRES_PASSWORD=jdcvcns_dev_password
       - POSTGRES_DB=jdcvcns
