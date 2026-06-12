@@ -5,12 +5,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODE="${RUN_346_MODE:-local}"
 CHECK_ONLY=false
 CONTINUE_ON_ERROR=false
+RUN_BACKGROUND=false
+ACTION="run"
 VERSIONS=("3.0" "4.0" "6.0")
 SELECTED_VERSIONS=()
+LOG_FILE="${RUN_346_LOG:-${SCRIPT_DIR}/run 3 4 6.log}"
+PID_FILE="${RUN_346_PID:-${SCRIPT_DIR}/run 3 4 6.pid}"
 
 usage() {
   cat <<'EOF'
 Usage: ./run\ 3\ 4\ 6.sh [options] [all|3.0|4.0|6.0 ...]
+       ./run\ 3\ 4\ 6.sh status
+       ./run\ 3\ 4\ 6.sh stop
 
 One-command organizer for the 3.0, 4.0, and 6.0 benchmark suites.
 With no version arguments, it runs 3.0, then 4.0, then the safe 6.0 default.
@@ -20,6 +26,7 @@ Modes:
   docker  Uses each version's compose.yaml test service.
 
 Options:
+  --background          Run the organizer in the background.
   --check-only          Validate files/data/tools, then exit.
   --continue-on-error   Continue to the next suite if one suite fails.
   --mode local|docker   Select runner mode.
@@ -31,11 +38,17 @@ Environment:
   QDRANT_TIMEOUT=300
   BM25_REGEX_TOKENIZER=1
   PYTHON_BIN=python3.11        Used by 6.0 local mode.
+  RUN_346_LOG=path             Background log path.
+  RUN_346_PID=path             Background PID path.
 EOF
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --background|background|runbackground)
+      RUN_BACKGROUND=true
+      shift
+      ;;
     --check-only)
       CHECK_ONLY=true
       shift
@@ -56,6 +69,14 @@ while [[ $# -gt 0 ]]; do
     --help|-h)
       usage
       exit 0
+      ;;
+    status)
+      ACTION="status"
+      shift
+      ;;
+    stop)
+      ACTION="stop"
+      shift
       ;;
     all)
       SELECTED_VERSIONS=("3.0" "4.0" "6.0")
@@ -89,6 +110,47 @@ export QDRANT_UPSERT_BATCH_SIZE="${QDRANT_UPSERT_BATCH_SIZE:-1}"
 export QDRANT_TIMEOUT="${QDRANT_TIMEOUT:-300}"
 export QDRANT_UPSERT_RETRIES="${QDRANT_UPSERT_RETRIES:-3}"
 export BM25_REGEX_TOKENIZER="${BM25_REGEX_TOKENIZER:-1}"
+
+background_pid() {
+  [[ -f "${PID_FILE}" ]] || return 1
+  local pid
+  pid="$(cat "${PID_FILE}" 2>/dev/null || true)"
+  [[ -n "${pid}" ]] || return 1
+  kill -0 "${pid}" 2>/dev/null || return 1
+  printf '%s\n' "${pid}"
+}
+
+status_run() {
+  local pid
+  if pid="$(background_pid)"; then
+    echo "Organizer is running."
+    echo "PID: ${pid}"
+    echo "Log: ${LOG_FILE}"
+    return 0
+  fi
+
+  echo "Organizer is not running."
+  echo "PID file: ${PID_FILE}"
+  echo "Log: ${LOG_FILE}"
+}
+
+stop_run() {
+  local pid
+  if ! pid="$(background_pid)"; then
+    echo "Organizer is not running."
+    rm -f "${PID_FILE}"
+    return 0
+  fi
+
+  echo "Stopping organizer PID ${pid}"
+  kill "${pid}"
+  sleep 2
+  if kill -0 "${pid}" 2>/dev/null; then
+    echo "PID ${pid} is still running; sending SIGKILL."
+    kill -9 "${pid}" 2>/dev/null || true
+  fi
+  rm -f "${PID_FILE}"
+}
 
 fail() {
   echo "ERROR: $*" >&2
@@ -150,6 +212,30 @@ preflight() {
   echo "6.0 default: BM25 regex tokenizer"
 }
 
+start_background() {
+  local pid
+  if pid="$(background_pid)"; then
+    echo "Organizer is already running."
+    echo "PID: ${pid}"
+    echo "Log: ${LOG_FILE}"
+    echo "Monitor: tail -f '${LOG_FILE}'"
+    exit 0
+  fi
+
+  mkdir -p "$(dirname "${LOG_FILE}")" "$(dirname "${PID_FILE}")"
+  touch "${LOG_FILE}"
+  (
+    cd "${SCRIPT_DIR}"
+    nohup "${SCRIPT_DIR}/run 3 4 6.sh" "${VERSIONS[@]}" >"${LOG_FILE}" 2>&1 </dev/null &
+    echo "$!" >"${PID_FILE}"
+  )
+  pid="$(cat "${PID_FILE}")"
+  echo "Started organizer in background."
+  echo "PID: ${pid}"
+  echo "Log: ${LOG_FILE}"
+  echo "Monitor: tail -f '${LOG_FILE}'"
+}
+
 run_version() {
   local version="$1"
   echo
@@ -173,9 +259,25 @@ run_version() {
   esac
 }
 
+case "${ACTION}" in
+  status)
+    status_run
+    exit 0
+    ;;
+  stop)
+    stop_run
+    exit 0
+    ;;
+esac
+
 preflight
 
 if [[ "${CHECK_ONLY}" == "true" ]]; then
+  exit 0
+fi
+
+if [[ "${RUN_BACKGROUND}" == "true" ]]; then
+  start_background
   exit 0
 fi
 
