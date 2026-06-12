@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# ruff: noqa: E402
+
 import argparse
 import os
 import sys
@@ -33,6 +35,7 @@ class Config:
     collection_name: str
     top_k: int
     batch_size: int
+    upsert_batch_size: int
     prefetch_multiplier: int
     recreate_collection: bool
     use_fp16: bool
@@ -40,6 +43,8 @@ class Config:
     qdrant_port: int
     qdrant_url: str | None
     qdrant_path: str | None
+    qdrant_timeout: float
+    qdrant_upsert_retries: int
     store_db: bool
 
 
@@ -52,6 +57,11 @@ def parse_args() -> Config:
     parser.add_argument("--collection", default=os.environ.get("QDRANT_COLLECTION", DEFAULT_COLLECTION))
     parser.add_argument("--top-k", type=int, default=int(os.environ.get("TOP_K", "5")))
     parser.add_argument("--batch-size", type=int, default=int(os.environ.get("BGE_BATCH_SIZE", "16")))
+    parser.add_argument(
+        "--upsert-batch-size",
+        type=int,
+        default=int(os.environ.get("QDRANT_UPSERT_BATCH_SIZE", "2")),
+    )
     parser.add_argument("--prefetch-multiplier", type=int, default=int(os.environ.get("PREFETCH_MULTIPLIER", "4")))
     parser.add_argument("--keep-collection", action="store_true")
     parser.add_argument("--no-fp16", action="store_true")
@@ -59,6 +69,12 @@ def parse_args() -> Config:
     parser.add_argument("--qdrant-port", type=int, default=int(os.environ.get("QDRANT_PORT", "16330")))
     parser.add_argument("--qdrant-url", default=os.environ.get("QDRANT_URL"))
     parser.add_argument("--qdrant-path", default=os.environ.get("QDRANT_PATH"))
+    parser.add_argument("--qdrant-timeout", type=float, default=float(os.environ.get("QDRANT_TIMEOUT", "120")))
+    parser.add_argument(
+        "--qdrant-upsert-retries",
+        type=int,
+        default=int(os.environ.get("QDRANT_UPSERT_RETRIES", "3")),
+    )
     args = parser.parse_args()
 
     return Config(
@@ -67,6 +83,7 @@ def parse_args() -> Config:
         collection_name=args.collection,
         top_k=max(1, args.top_k),
         batch_size=max(1, args.batch_size),
+        upsert_batch_size=max(1, args.upsert_batch_size),
         prefetch_multiplier=max(1, args.prefetch_multiplier),
         recreate_collection=not args.keep_collection,
         use_fp16=not args.no_fp16,
@@ -74,6 +91,8 @@ def parse_args() -> Config:
         qdrant_port=args.qdrant_port,
         qdrant_url=args.qdrant_url,
         qdrant_path=args.qdrant_path,
+        qdrant_timeout=max(1.0, args.qdrant_timeout),
+        qdrant_upsert_retries=max(1, args.qdrant_upsert_retries),
         store_db=env_flag("STORE_DB", True),
     )
 
@@ -133,7 +152,7 @@ def create_sparse_vector(sparse_data: dict[Any, Any], models):
     return models.SparseVector(indices=indices, values=values)
 
 
-def chunks(items: list[str], batch_size: int) -> Iterable[tuple[int, list[str]]]:
+def chunks(items: list[Any], batch_size: int) -> Iterable[tuple[int, list[Any]]]:
     for start in range(0, len(items), batch_size):
         yield start, items[start : start + batch_size]
 
@@ -141,10 +160,10 @@ def chunks(items: list[str], batch_size: int) -> Iterable[tuple[int, list[str]]]
 def connect_qdrant(config: Config):
     QdrantClient, _ = require_qdrant()
     if config.qdrant_path:
-        return QdrantClient(path=config.qdrant_path)
+        return QdrantClient(path=config.qdrant_path, timeout=config.qdrant_timeout)
     if config.qdrant_url:
-        return QdrantClient(url=config.qdrant_url)
-    return QdrantClient(host=config.qdrant_host, port=config.qdrant_port)
+        return QdrantClient(url=config.qdrant_url, timeout=config.qdrant_timeout)
+    return QdrantClient(host=config.qdrant_host, port=config.qdrant_port, timeout=config.qdrant_timeout)
 
 
 def prepare_collection(client, config: Config, models) -> None:
@@ -184,6 +203,23 @@ def encode_batch(model, texts: list[str], batch_size: int) -> dict[str, Any]:
     )
 
 
+def upsert_points_with_retry(client, config: Config, points: list[Any]) -> None:
+    for attempt in range(1, config.qdrant_upsert_retries + 1):
+        try:
+            client.upsert(collection_name=config.collection_name, points=points, wait=True)
+            return
+        except Exception as exc:
+            if attempt >= config.qdrant_upsert_retries:
+                raise
+            delay_seconds = min(2 ** attempt, 30)
+            print(
+                f"Qdrant upsert failed on attempt {attempt}/{config.qdrant_upsert_retries}: "
+                f"{type(exc).__name__}: {exc}. Retrying in {delay_seconds}s...",
+                file=sys.stderr,
+            )
+            time.sleep(delay_seconds)
+
+
 def index_jobs(client, model, df_jd: pd.DataFrame, config: Config, models) -> None:
     jd_texts = [get_jd_text(row) for _, row in df_jd.iterrows()]
     progress = tqdm(total=len(jd_texts), desc="Indexing JDs")
@@ -211,7 +247,8 @@ def index_jobs(client, model, df_jd: pd.DataFrame, config: Config, models) -> No
                 )
             )
 
-        client.upsert(collection_name=config.collection_name, points=points)
+        for _, point_batch in chunks(points, config.upsert_batch_size):
+            upsert_points_with_retry(client, config, point_batch)
         progress.update(len(text_batch))
 
     progress.close()
@@ -303,6 +340,7 @@ def run_bgem3_qdrant(config: Config) -> dict[str, Any]:
 
     run_id = None
     if config.store_db:
+        expected_top_k = min(config.top_k, len(df_jd))
         matches_by_cv: dict[int, list[dict[str, Any]]] = {}
         for match in matches:
             matches_by_cv.setdefault(int(match["cv_id"]), []).append(match)
@@ -329,7 +367,10 @@ def run_bgem3_qdrant(config: Config) -> dict[str, Any]:
                     params={
                         "top_k": config.top_k,
                         "batch_size": config.batch_size,
+                        "upsert_batch_size": config.upsert_batch_size,
                         "prefetch_multiplier": config.prefetch_multiplier,
+                        "qdrant_timeout": config.qdrant_timeout,
+                        "qdrant_upsert_retries": config.qdrant_upsert_retries,
                         "collection": config.collection_name,
                     },
                     dataset_meta={"dataset_dir": str(config.dataset_dir)},
@@ -339,7 +380,7 @@ def run_bgem3_qdrant(config: Config) -> dict[str, Any]:
                 get_cv_text,
                 get_jd_text,
                 ranked_matches,
-                top_k=config.top_k,
+                top_k=expected_top_k,
                 started_monotonic=started_monotonic,
             )
         finally:

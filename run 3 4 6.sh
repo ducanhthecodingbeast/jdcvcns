@@ -2,23 +2,34 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MODE="${RUN_346_MODE:-docker}"
+MODE="${RUN_346_MODE:-local}"
 CHECK_ONLY=false
 CONTINUE_ON_ERROR=false
 VERSIONS=("3.0" "4.0" "6.0")
+SELECTED_VERSIONS=()
 
 usage() {
   cat <<'EOF'
-Usage: ./run\ 3\ 4\ 6.sh [--check-only] [--mode docker|local] [--continue-on-error]
+Usage: ./run\ 3\ 4\ 6.sh [options] [all|3.0|4.0|6.0 ...]
 
-Runs the 3.0, 4.0, and 6.0 benchmark suites in order.
+One-command organizer for the 3.0, 4.0, and 6.0 benchmark suites.
+With no version arguments, it runs 3.0, then 4.0, then the safe 6.0 default.
 
 Modes:
-  docker  Uses each version's compose.yaml test service. Default and recommended.
-  local   Uses each version's local run.sh.
+  local   Uses each version's local run.sh. Default and recommended.
+  docker  Uses each version's compose.yaml test service.
+
+Options:
+  --check-only          Validate files/data/tools, then exit.
+  --continue-on-error   Continue to the next suite if one suite fails.
+  --mode local|docker   Select runner mode.
+  -h, --help            Show this help.
 
 Environment:
-  RUN_346_MODE=docker|local
+  RUN_346_MODE=local|docker
+  QDRANT_UPSERT_BATCH_SIZE=1
+  QDRANT_TIMEOUT=300
+  BM25_REGEX_TOKENIZER=1
   PYTHON_BIN=python3.11        Used by 6.0 local mode.
 EOF
 }
@@ -34,12 +45,33 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --mode)
+      if [[ $# -lt 2 ]]; then
+        echo "Missing value for --mode. Use local or docker." >&2
+        usage >&2
+        exit 2
+      fi
       MODE="${2:-}"
       shift 2
       ;;
     --help|-h)
       usage
       exit 0
+      ;;
+    all)
+      SELECTED_VERSIONS=("3.0" "4.0" "6.0")
+      shift
+      ;;
+    3|3.0)
+      SELECTED_VERSIONS+=("3.0")
+      shift
+      ;;
+    4|4.0)
+      SELECTED_VERSIONS+=("4.0")
+      shift
+      ;;
+    6|6.0)
+      SELECTED_VERSIONS+=("6.0")
+      shift
       ;;
     *)
       echo "Unknown argument: $1" >&2
@@ -48,6 +80,15 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [[ ${#SELECTED_VERSIONS[@]} -gt 0 ]]; then
+  VERSIONS=("${SELECTED_VERSIONS[@]}")
+fi
+
+export QDRANT_UPSERT_BATCH_SIZE="${QDRANT_UPSERT_BATCH_SIZE:-1}"
+export QDRANT_TIMEOUT="${QDRANT_TIMEOUT:-300}"
+export QDRANT_UPSERT_RETRIES="${QDRANT_UPSERT_RETRIES:-3}"
+export BM25_REGEX_TOKENIZER="${BM25_REGEX_TOKENIZER:-1}"
 
 fail() {
   echo "ERROR: $*" >&2
@@ -104,6 +145,9 @@ preflight() {
 
   echo "Preflight OK."
   echo "Mode: ${MODE}"
+  echo "Versions: ${VERSIONS[*]}"
+  echo "Qdrant writes: batch=${QDRANT_UPSERT_BATCH_SIZE}, timeout=${QDRANT_TIMEOUT}s"
+  echo "6.0 default: BM25 regex tokenizer"
 }
 
 run_version() {
@@ -121,7 +165,7 @@ run_version() {
       (cd "${SCRIPT_DIR}/${version}" && ./run.sh)
       ;;
     6.0)
-      (cd "${SCRIPT_DIR}/6.0" && ./run.sh all)
+      (cd "${SCRIPT_DIR}/6.0" && ./run.sh 6.2 -- --regex-tokenizer)
       ;;
     *)
       fail "Unknown version: ${version}"

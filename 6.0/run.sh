@@ -9,7 +9,8 @@ CACHE_DIR="${SCRIPT_DIR}/.cache"
 LOG_FILE="${RUN_LOG:-${SCRIPT_DIR}/run.log}"
 PID_FILE="${RUN_PID:-${SCRIPT_DIR}/run.pid}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
-VARIANT="${RUN_VARIANT:-all}"
+VARIANT="${RUN_VARIANT:-6.2}"
+ENV_BM25_REGEX_TOKENIZER="${BM25_REGEX_TOKENIZER:-}"
 
 RUN_BACKGROUND=false
 while [[ $# -gt 0 ]]; do
@@ -126,6 +127,8 @@ if [[ -f "${LOCAL_ENV}" ]]; then
   source "${LOCAL_ENV}"
   set +a
 fi
+
+export BM25_REGEX_TOKENIZER="${ENV_BM25_REGEX_TOKENIZER:-1}"
 
 if [[ ! -x "${VENV_DIR}/bin/python" ]]; then
   create_venv

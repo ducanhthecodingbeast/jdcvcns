@@ -8,6 +8,8 @@ LOCAL_ENV="${SCRIPT_DIR}/.env.local"
 CACHE_DIR="${SCRIPT_DIR}/.cache"
 LOG_FILE="${RUN_LOG:-${SCRIPT_DIR}/run.log}"
 PID_FILE="${RUN_PID:-${SCRIPT_DIR}/run.pid}"
+ENV_QDRANT_TIMEOUT="${QDRANT_TIMEOUT:-}"
+ENV_QDRANT_UPSERT_BATCH_SIZE="${QDRANT_UPSERT_BATCH_SIZE:-}"
 
 RUN_BACKGROUND=false
 while [[ $# -gt 0 ]]; do
@@ -94,6 +96,10 @@ if [[ -f "${LOCAL_ENV}" ]]; then
   source "${LOCAL_ENV}"
   set +a
 fi
+
+export QDRANT_UPSERT_BATCH_SIZE="${ENV_QDRANT_UPSERT_BATCH_SIZE:-1}"
+export QDRANT_TIMEOUT="${ENV_QDRANT_TIMEOUT:-300}"
+export QDRANT_UPSERT_RETRIES="${QDRANT_UPSERT_RETRIES:-3}"
 
 if [[ ! -x "${VENV_DIR}/bin/python" ]]; then
   create_venv

@@ -8,18 +8,26 @@ LOCAL_ENV="${SCRIPT_DIR}/.env.local"
 CACHE_DIR="${SCRIPT_DIR}/.cache"
 LOG_FILE="${RUN_LOG:-${SCRIPT_DIR}/run.log}"
 PID_FILE="${RUN_PID:-${SCRIPT_DIR}/run.pid}"
+ENV_QDRANT_TIMEOUT="${QDRANT_TIMEOUT:-}"
+ENV_QDRANT_UPSERT_BATCH_SIZE="${QDRANT_UPSERT_BATCH_SIZE:-}"
 
 RUN_BACKGROUND=false
-if [[ "${1:-}" == "--background" || "${1:-}" == "background" || "${1:-}" == "runbackground" ]]; then
-  RUN_BACKGROUND=true
-  shift
-fi
-
-if [[ $# -gt 0 ]]; then
-  echo "Unknown argument(s): $*" >&2
-  echo "Usage: ./run.sh [--background]" >&2
-  exit 2
-fi
+while [[ $# -gt 0 ]]; do
+  case "${1}" in
+    --background|background|runbackground)
+      RUN_BACKGROUND=true
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+RUN_ARGS=("$@")
 
 if [[ "${RUN_BACKGROUND}" == "true" ]]; then
   if [[ -f "${PID_FILE}" ]]; then
@@ -36,7 +44,7 @@ if [[ "${RUN_BACKGROUND}" == "true" ]]; then
   mkdir -p "$(dirname "${LOG_FILE}")"
   touch "${LOG_FILE}"
   cd "${SCRIPT_DIR}"
-  nohup "${SCRIPT_DIR}/run.sh" >"${LOG_FILE}" 2>&1 </dev/null &
+  nohup "${SCRIPT_DIR}/run.sh" "${RUN_ARGS[@]}" >"${LOG_FILE}" 2>&1 </dev/null &
   pid="$!"
   echo "${pid}" >"${PID_FILE}"
 
@@ -89,6 +97,10 @@ if [[ -f "${LOCAL_ENV}" ]]; then
   set +a
 fi
 
+export QDRANT_UPSERT_BATCH_SIZE="${ENV_QDRANT_UPSERT_BATCH_SIZE:-1}"
+export QDRANT_TIMEOUT="${ENV_QDRANT_TIMEOUT:-300}"
+export QDRANT_UPSERT_RETRIES="${QDRANT_UPSERT_RETRIES:-3}"
+
 if [[ ! -x "${VENV_DIR}/bin/python" ]]; then
   create_venv
 fi
@@ -110,4 +122,4 @@ if [[ -f "${REPO_ROOT}/scripts/compose" ]]; then
   "${REPO_ROOT}/scripts/compose" up -d
 fi
 
-"${VENV_DIR}/bin/python" "${SCRIPT_DIR}/bgmewdranttesting3.0.py"
+"${VENV_DIR}/bin/python" "${SCRIPT_DIR}/bgmewdranttesting3.0.py" "${RUN_ARGS[@]}"

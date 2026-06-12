@@ -119,7 +119,7 @@ def get_or_create_run(conn, info: RunInfo, *, allow_new_attempt: bool = True) ->
                 return int(run_id)
 
             # Create a new attempt key to avoid uniqueness collisions.
-            attempt_key = f"{run_key}:{int(time.time())}"
+            attempt_key = f"{run_key}:{time.time_ns()}"
             cur.execute(
                 """
                 INSERT INTO test_runs (run_key, run_name, algorithm, model_name, params, dataset_meta, notes, started_at)

@@ -8,7 +8,7 @@ Goal: compare three CV/JD matching baselines on the same dataset snapshots:
 
 Shared data is read from `../Data`. This project expects `jd.csv` or `JOB_DATA_FINAL.csv`, plus one CV source such as `mockcv.csv`, `cv.csv`, or `USER_DATA_FINAL.csv`.
 
-Run all variants:
+Run the safest default variant first:
 
 ```bash
 cd 6.0
@@ -27,6 +27,7 @@ Run one variant:
 ./run.sh 6.0 -- --top-k 20
 ./run.sh 6.1 -- --cv-limit 100 --jd-limit 100
 ./run.sh 6.2 -- --regex-tokenizer
+./run.sh all
 ```
 
 Run in Docker Compose:

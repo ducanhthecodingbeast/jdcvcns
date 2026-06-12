@@ -17,5 +17,5 @@ kaggle
 datasets
 docling
 FlagEmbedding
-qdrant-client
+qdrant-client>=1.12,<1.14
 notebook

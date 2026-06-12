@@ -25,12 +25,13 @@ Run:
 
 ```bash
 cd 3.0
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-../scripts/compose up -d
-python bgmewdranttesting3.0.py
+./run.sh
+```
+
+`run.sh` defaults to safer Qdrant write settings:
+
+```bash
+QDRANT_UPSERT_BATCH_SIZE=1 QDRANT_TIMEOUT=300
 ```
 
 Run fully in Docker Compose:

@@ -34,7 +34,7 @@ services:
       RANDOM_STATE: ${RANDOM_STATE:-42}
       BM25_K1: ${BM25_K1:-1.5}
       BM25_B: ${BM25_B:-0.75}
-      BM25_REGEX_TOKENIZER: ${BM25_REGEX_TOKENIZER:-0}
+      BM25_REGEX_TOKENIZER: ${BM25_REGEX_TOKENIZER:-1}
       WRITE_RESULTS: ${WRITE_RESULTS:-1}
     depends_on:
       postgres:

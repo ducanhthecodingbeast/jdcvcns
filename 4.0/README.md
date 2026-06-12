@@ -41,6 +41,12 @@ Pass runner arguments after the launcher flags:
 ./run.sh -- --raw-reranker-scores
 ```
 
+`run.sh` defaults to safer Qdrant write settings:
+
+```bash
+QDRANT_UPSERT_BATCH_SIZE=1 QDRANT_TIMEOUT=300
+```
+
 Run fully in Docker Compose:
 
 ```bash

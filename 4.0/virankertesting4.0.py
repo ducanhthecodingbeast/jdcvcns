@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# ruff: noqa: E402
+
 import argparse
 import math
 import os
@@ -48,6 +50,7 @@ class Config:
     collection_name: str
     top_k: int
     batch_size: int
+    upsert_batch_size: int
     reranker_batch_size: int
     reranker_max_length: int
     reranker_query_max_length: int | None
@@ -59,6 +62,8 @@ class Config:
     qdrant_port: int
     qdrant_url: str | None
     qdrant_path: str | None
+    qdrant_timeout: float
+    qdrant_upsert_retries: int
     store_db: bool
     write_results: bool
 
@@ -72,6 +77,7 @@ def parse_args() -> Config:
     parser.add_argument("--collection", default=os.environ.get("QDRANT_COLLECTION", DEFAULT_COLLECTION))
     parser.add_argument("--top-k", type=int, default=env_int("TOP_K", 10))
     parser.add_argument("--batch-size", type=int, default=env_int("BGE_BATCH_SIZE", 16))
+    parser.add_argument("--upsert-batch-size", type=int, default=env_int("QDRANT_UPSERT_BATCH_SIZE", 4))
     parser.add_argument("--reranker-batch-size", type=int, default=env_int("VIRANKER_BATCH_SIZE", 32))
     parser.add_argument("--reranker-max-length", type=int, default=env_int("VIRANKER_MAX_LENGTH", 1024))
     parser.add_argument(
@@ -89,6 +95,8 @@ def parse_args() -> Config:
     parser.add_argument("--qdrant-port", type=int, default=env_int("QDRANT_PORT", 16340))
     parser.add_argument("--qdrant-url", default=os.environ.get("QDRANT_URL"))
     parser.add_argument("--qdrant-path", default=os.environ.get("QDRANT_PATH"))
+    parser.add_argument("--qdrant-timeout", type=float, default=float(os.environ.get("QDRANT_TIMEOUT", "120")))
+    parser.add_argument("--qdrant-upsert-retries", type=int, default=env_int("QDRANT_UPSERT_RETRIES", 3))
     args = parser.parse_args()
     query_max_length = args.reranker_query_max_length
     if query_max_length is not None and query_max_length <= 0:
@@ -100,6 +108,7 @@ def parse_args() -> Config:
         collection_name=args.collection,
         top_k=max(1, args.top_k),
         batch_size=max(1, args.batch_size),
+        upsert_batch_size=max(1, args.upsert_batch_size),
         reranker_batch_size=max(1, args.reranker_batch_size),
         reranker_max_length=max(1, args.reranker_max_length),
         reranker_query_max_length=query_max_length,
@@ -111,6 +120,8 @@ def parse_args() -> Config:
         qdrant_port=args.qdrant_port,
         qdrant_url=args.qdrant_url,
         qdrant_path=args.qdrant_path,
+        qdrant_timeout=max(1.0, args.qdrant_timeout),
+        qdrant_upsert_retries=max(1, args.qdrant_upsert_retries),
         store_db=env_flag("STORE_DB", True),
         write_results=env_flag("WRITE_RESULTS", True) and not args.no_write_results,
     )
@@ -179,7 +190,7 @@ def create_sparse_vector(sparse_data: dict[Any, Any], models):
     return models.SparseVector(indices=indices, values=values)
 
 
-def chunks(items: list[str], batch_size: int) -> Iterable[tuple[int, list[str]]]:
+def chunks(items: list[Any], batch_size: int) -> Iterable[tuple[int, list[Any]]]:
     for start in range(0, len(items), batch_size):
         yield start, items[start : start + batch_size]
 
@@ -187,10 +198,10 @@ def chunks(items: list[str], batch_size: int) -> Iterable[tuple[int, list[str]]]
 def connect_qdrant(config: Config):
     QdrantClient, _ = require_qdrant()
     if config.qdrant_path:
-        return QdrantClient(path=config.qdrant_path)
+        return QdrantClient(path=config.qdrant_path, timeout=config.qdrant_timeout)
     if config.qdrant_url:
-        return QdrantClient(url=config.qdrant_url)
-    return QdrantClient(host=config.qdrant_host, port=config.qdrant_port)
+        return QdrantClient(url=config.qdrant_url, timeout=config.qdrant_timeout)
+    return QdrantClient(host=config.qdrant_host, port=config.qdrant_port, timeout=config.qdrant_timeout)
 
 
 def prepare_collection(client, config: Config, models) -> None:
@@ -283,6 +294,23 @@ def compute_reranker_scores(reranker, pairs: list[list[str]], config: Config) ->
         return [sigmoid(score) for score in scores] if config.reranker_normalize else scores
 
 
+def upsert_points_with_retry(client, config: Config, points: list[Any]) -> None:
+    for attempt in range(1, config.qdrant_upsert_retries + 1):
+        try:
+            client.upsert(collection_name=config.collection_name, points=points, wait=True)
+            return
+        except Exception as exc:
+            if attempt >= config.qdrant_upsert_retries:
+                raise
+            delay_seconds = min(2 ** attempt, 30)
+            print(
+                f"Qdrant upsert failed on attempt {attempt}/{config.qdrant_upsert_retries}: "
+                f"{type(exc).__name__}: {exc}. Retrying in {delay_seconds}s...",
+                file=sys.stderr,
+            )
+            time.sleep(delay_seconds)
+
+
 def index_jobs(client, model, df_jd: pd.DataFrame, config: Config, models) -> None:
     jd_texts = [get_jd_text(row) for _, row in df_jd.iterrows()]
     progress = tqdm(total=len(jd_texts), desc="Indexing JDs")
@@ -309,7 +337,8 @@ def index_jobs(client, model, df_jd: pd.DataFrame, config: Config, models) -> No
                 )
             )
 
-        client.upsert(collection_name=config.collection_name, points=points)
+        for _, point_batch in chunks(points, config.upsert_batch_size):
+            upsert_points_with_retry(client, config, point_batch)
         progress.update(len(text_batch))
 
     progress.close()
@@ -500,11 +529,14 @@ def run_bgem3_qdrant(config: Config) -> dict[str, Any]:
                     params={
                         "top_k": config.top_k,
                         "batch_size": config.batch_size,
+                        "upsert_batch_size": config.upsert_batch_size,
                         "reranker_batch_size": config.reranker_batch_size,
                         "reranker_max_length": config.reranker_max_length,
                         "reranker_query_max_length": config.reranker_query_max_length,
                         "reranker_normalize": config.reranker_normalize,
                         "prefetch_multiplier": config.prefetch_multiplier,
+                        "qdrant_timeout": config.qdrant_timeout,
+                        "qdrant_upsert_retries": config.qdrant_upsert_retries,
                         "collection": config.collection_name,
                         "retriever_model": BGE_M3_MODEL,
                         "reranker_model": VIRANKER_MODEL,
