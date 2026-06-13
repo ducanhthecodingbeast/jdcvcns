@@ -18,5 +18,5 @@ datasets
 docling
 FlagEmbedding
 qdrant-client>=1.12,<1.14
-pinecone[grpc]>=6,<8
+pinecone>=6,<8
 notebook
