@@ -6,6 +6,27 @@ from typing import Iterable
 
 import pandas as pd
 
+try:
+    import transformers
+    if not hasattr(transformers.PreTrainedTokenizerBase, "prepare_for_model"):
+        def monkey_patch_prepare_for_model(self, ids, pair_ids=None, add_special_tokens=True, padding=False, truncation=False, max_length=None, **kwargs):
+            if truncation == 'only_second' and max_length is not None and pair_ids is not None:
+                num_special = self.num_special_tokens_to_add(pair=True)
+                max_pair_len = max_length - len(ids) - num_special
+                pair_ids = pair_ids[:max_pair_len] if max_pair_len > 0 else []
+            input_ids = self.build_inputs_with_special_tokens(ids, pair_ids) if add_special_tokens else (ids + (pair_ids if pair_ids else []))
+            res = {"input_ids": input_ids, "attention_mask": [1] * len(input_ids)}
+            if "token_type_ids" in self.model_input_names:
+                try:
+                    res["token_type_ids"] = self.create_token_type_ids_from_sequences(ids, pair_ids) if add_special_tokens else ([0]*len(ids) + [1]*len(pair_ids if pair_ids else []))
+                except Exception:
+                    pass
+            return res
+        transformers.PreTrainedTokenizerBase.prepare_for_model = monkey_patch_prepare_for_model
+except ImportError:
+    pass
+
+
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 REPO_ROOT = PROJECT_ROOT.parent
