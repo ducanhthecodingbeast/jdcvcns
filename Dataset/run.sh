@@ -11,14 +11,26 @@ LOG_FILE="${RUN_LOG:-${SCRIPT_DIR}/run.log}"
 PID_FILE="${RUN_PID:-${SCRIPT_DIR}/run.pid}"
 
 RUN_BACKGROUND=false
-if [[ "${1:-}" == "--background" || "${1:-}" == "background" || "${1:-}" == "runbackground" ]]; then
-  RUN_BACKGROUND=true
-  shift
-fi
+CHECK_ONLY=false
+while [[ $# -gt 0 ]]; do
+  case "${1}" in
+    --background|background|runbackground)
+      RUN_BACKGROUND=true
+      shift
+      ;;
+    --check-only)
+      CHECK_ONLY=true
+      shift
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
 
 if [[ $# -gt 0 ]]; then
   echo "Unknown argument(s): $*" >&2
-  echo "Usage: ./run.sh [--background]" >&2
+  echo "Usage: ./run.sh [--background] [--check-only]" >&2
   exit 2
 fi
 
@@ -98,7 +110,7 @@ if ! "${VENV_DIR}/bin/python" -m pip --version >/dev/null 2>&1; then
   bootstrap_pip
 fi
 
-if [[ -z "${KAGGLE_USERNAME:-}" || -z "${KAGGLE_KEY:-}" ]]; then
+if [[ "${CHECK_ONLY}" != "true" && ( -z "${KAGGLE_USERNAME:-}" || -z "${KAGGLE_KEY:-}" ) ]]; then
   echo "Missing KAGGLE_USERNAME or KAGGLE_KEY." >&2
   echo "Export them before running, or put them in ${LOCAL_ENV}:" >&2
   echo "KAGGLE_USERNAME=your_username" >&2
@@ -113,8 +125,21 @@ export SENTENCE_TRANSFORMERS_HOME="${SENTENCE_TRANSFORMERS_HOME:-${CACHE_DIR}/se
 
 cd "${REPO_ROOT}"
 
-"${VENV_DIR}/bin/python" -m pip install --upgrade pip
-"${VENV_DIR}/bin/python" -m pip install -r "${SCRIPT_DIR}/requirements.txt"
+if [[ "${SKIP_PIP_INSTALL:-0}" == "1" ]]; then
+  echo "Skipping pip install because SKIP_PIP_INSTALL=1"
+else
+  "${VENV_DIR}/bin/python" -m pip install --upgrade pip
+  "${VENV_DIR}/bin/python" -m pip install -r "${SCRIPT_DIR}/requirements.txt"
+fi
+
+if [[ "${CHECK_ONLY}" == "true" ]]; then
+  "${VENV_DIR}/bin/python" -m Dataset.mockcv \
+    --jd-path "${DATA_DIR}/jd.csv" \
+    --cv-path "${DATA_DIR}/cv.csv" \
+    --target-dir "${DATA_DIR}" \
+    --check-only
+  exit 0
+fi
 
 "${VENV_DIR}/bin/python" "${SCRIPT_DIR}/data_preprocessing.py"
 

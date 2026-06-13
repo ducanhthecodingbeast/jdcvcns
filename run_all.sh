@@ -2,27 +2,41 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOG_FILE="${PHASE_RUN_LOG:-${SCRIPT_DIR}/.phase_state/default/run.log}"
+PID_FILE="${PHASE_RUN_PID:-${SCRIPT_DIR}/.phase_state/default/run.pid}"
 
-echo "=========================================="
-echo "Starting all environments in the background"
-echo "=========================================="
+RUN_BACKGROUND=false
+if [[ "${1:-}" == "--background" || "${1:-}" == "background" || "${1:-}" == "runbackground" ]]; then
+  RUN_BACKGROUND=true
+  shift
+fi
 
-echo "Starting Dataset preparation..."
-"${SCRIPT_DIR}/Dataset/run.sh" --background
+if [[ "${RUN_BACKGROUND}" == "true" ]]; then
+  if [[ -f "${PID_FILE}" ]]; then
+    old_pid="$(cat "${PID_FILE}" 2>/dev/null || true)"
+    if [[ -n "${old_pid}" ]] && kill -0 "${old_pid}" 2>/dev/null; then
+      echo "Phased suite is already running."
+      echo "PID: ${old_pid}"
+      echo "Log: ${LOG_FILE}"
+      echo "Monitor: tail -f ${LOG_FILE}"
+      exit 0
+    fi
+  fi
 
-echo "Starting 1.0 test suite..."
-"${SCRIPT_DIR}/1.0/run.sh" --background
+  mkdir -p "$(dirname "${LOG_FILE}")" "$(dirname "${PID_FILE}")"
+  touch "${LOG_FILE}"
+  (
+    cd "${SCRIPT_DIR}"
+    nohup "${SCRIPT_DIR}/scripts/phased_suite.py" "$@" >"${LOG_FILE}" 2>&1 </dev/null &
+    echo "$!" >"${PID_FILE}"
+  )
 
-echo "Starting 2.0 test suite..."
-"${SCRIPT_DIR}/2.0/run.sh" --background
+  pid="$(cat "${PID_FILE}")"
+  echo "Started phased suite in background."
+  echo "PID: ${pid}"
+  echo "Log: ${LOG_FILE}"
+  echo "Monitor: tail -f ${LOG_FILE}"
+  exit 0
+fi
 
-echo "Starting 3.0 test suite..."
-"${SCRIPT_DIR}/3.0/run.sh" --background
-
-echo "Starting 4.0 test suite..."
-"${SCRIPT_DIR}/4.0/run.sh" --background
-
-echo "=========================================="
-echo "All scripts have been launched!"
-echo "Check the run.log file in each folder to monitor progress."
-echo "Example: tail -f 4.0/run.log"
+exec "${SCRIPT_DIR}/scripts/phased_suite.py" "$@"

@@ -8,18 +8,29 @@ LOCAL_ENV="${SCRIPT_DIR}/.env.local"
 CACHE_DIR="${SCRIPT_DIR}/.cache"
 LOG_FILE="${RUN_LOG:-${SCRIPT_DIR}/run.log}"
 PID_FILE="${RUN_PID:-${SCRIPT_DIR}/run.pid}"
+VARIANT="${RUN_VARIANT:-all}"
 
 RUN_BACKGROUND=false
-if [[ "${1:-}" == "--background" || "${1:-}" == "background" || "${1:-}" == "runbackground" ]]; then
-  RUN_BACKGROUND=true
-  shift
-fi
-
-if [[ $# -gt 0 ]]; then
-  echo "Unknown argument(s): $*" >&2
-  echo "Usage: ./run.sh [--background]" >&2
-  exit 2
-fi
+while [[ $# -gt 0 ]]; do
+  case "${1}" in
+    --background|background|runbackground)
+      RUN_BACKGROUND=true
+      shift
+      ;;
+    all|ranking|match|2.1|2.2|2.3|upload|2.0)
+      VARIANT="${1}"
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+RUN_ARGS=("$@")
 
 if [[ "${RUN_BACKGROUND}" == "true" ]]; then
   if [[ -f "${PID_FILE}" ]]; then
@@ -36,7 +47,7 @@ if [[ "${RUN_BACKGROUND}" == "true" ]]; then
   mkdir -p "$(dirname "${LOG_FILE}")"
   touch "${LOG_FILE}"
   cd "${SCRIPT_DIR}"
-  nohup "${SCRIPT_DIR}/run.sh" >"${LOG_FILE}" 2>&1 </dev/null &
+  nohup "${SCRIPT_DIR}/run.sh" "${VARIANT}" -- "${RUN_ARGS[@]}" >"${LOG_FILE}" 2>&1 </dev/null &
   pid="$!"
   echo "${pid}" >"${PID_FILE}"
 
@@ -89,6 +100,34 @@ if [[ -f "${LOCAL_ENV}" ]]; then
   set +a
 fi
 
+run_variant() {
+  local variant="$1"
+  local script
+
+  case "${variant}" in
+    2.1)
+      script="dotpdtesting2.1.py"
+      ;;
+    2.2)
+      script="dotpdtesting2.2.py"
+      ;;
+    2.3)
+      script="dotpdtesting2.3.py"
+      ;;
+    2.0|upload)
+      script="dotpdtesting2.0.py"
+      ;;
+    *)
+      echo "Unknown 2.0 variant: ${variant}" >&2
+      echo "Usage: ./run.sh [--background] [all|ranking|match|2.1|2.2|2.3|upload]" >&2
+      exit 2
+      ;;
+  esac
+
+  echo "Running ${script}"
+  "${VENV_DIR}/bin/python" "${SCRIPT_DIR}/${script}" "${RUN_ARGS[@]}"
+}
+
 if [[ ! -x "${VENV_DIR}/bin/python" ]]; then
   create_venv
 fi
@@ -103,11 +142,24 @@ export SENTENCE_TRANSFORMERS_HOME="${SENTENCE_TRANSFORMERS_HOME:-${CACHE_DIR}/se
 
 cd "${SCRIPT_DIR}"
 
-"${VENV_DIR}/bin/python" -m pip install --upgrade pip
-"${VENV_DIR}/bin/python" -m pip install -r "${SCRIPT_DIR}/requirements.txt"
+if [[ "${SKIP_PIP_INSTALL:-0}" == "1" ]]; then
+  echo "Skipping pip install because SKIP_PIP_INSTALL=1"
+else
+  "${VENV_DIR}/bin/python" -m pip install --upgrade pip
+  "${VENV_DIR}/bin/python" -m pip install -r "${SCRIPT_DIR}/requirements.txt"
+fi
 
 if [[ -f "${REPO_ROOT}/scripts/compose" ]]; then
   "${REPO_ROOT}/scripts/compose" up -d
 fi
 
-"${VENV_DIR}/bin/python" "${SCRIPT_DIR}/dotpdtesting2.0.py"
+case "${VARIANT}" in
+  all|ranking|match)
+    run_variant "2.1"
+    run_variant "2.2"
+    run_variant "2.3"
+    ;;
+  *)
+    run_variant "${VARIANT}"
+    ;;
+esac

@@ -103,8 +103,12 @@ export SENTENCE_TRANSFORMERS_HOME="${SENTENCE_TRANSFORMERS_HOME:-${CACHE_DIR}/se
 
 cd "${SCRIPT_DIR}"
 
-"${VENV_DIR}/bin/python" -m pip install --upgrade pip
-"${VENV_DIR}/bin/python" -m pip install -r "${SCRIPT_DIR}/requirements.txt"
+if [[ "${SKIP_PIP_INSTALL:-0}" == "1" ]]; then
+  echo "Skipping pip install because SKIP_PIP_INSTALL=1"
+else
+  "${VENV_DIR}/bin/python" -m pip install --upgrade pip
+  "${VENV_DIR}/bin/python" -m pip install -r "${SCRIPT_DIR}/requirements.txt"
+fi
 
 if [[ -f "${REPO_ROOT}/scripts/compose" ]]; then
   "${REPO_ROOT}/scripts/compose" up -d

@@ -10,20 +10,6 @@ from tqdm import tqdm
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = REPO_ROOT / "Data"
 
-try:
-    from .localllm import (
-        build_enrich_cv_prompt,
-        build_mock_cv_prompt,
-        generate_with_local_llm,
-    )
-except ImportError:
-    from localllm import (
-        build_enrich_cv_prompt,
-        build_mock_cv_prompt,
-        generate_with_local_llm,
-    )
-
-
 REQUIRED_MOCK_CV_COLUMNS = {
     "Tên ứng viên",
     "Vị trí ứng tuyển",
@@ -38,6 +24,22 @@ REQUIRED_MOCK_CV_COLUMNS = {
 
 REQUIRED_JD_COLUMNS = {"Vị trí cần tuyển"}
 REQUIRED_SOURCE_CV_COLUMNS = {"Tên ứng viên", "Vị trí ứng tuyển"}
+
+
+def require_localllm():
+    try:
+        from .localllm import (
+            build_enrich_cv_prompt,
+            build_mock_cv_prompt,
+            generate_with_local_llm,
+        )
+    except ImportError:
+        from localllm import (
+            build_enrich_cv_prompt,
+            build_mock_cv_prompt,
+            generate_with_local_llm,
+        )
+    return build_enrich_cv_prompt, build_mock_cv_prompt, generate_with_local_llm
 
 
 def is_valid_mockcv(path: str | Path) -> bool:
@@ -144,6 +146,7 @@ def generate_mock_cvs_for_titles(
     title_col: str = "Vị trí cần tuyển",
     title_count: int = 30,
 ) -> pd.DataFrame:
+    _, build_mock_cv_prompt, generate_with_local_llm = require_localllm()
     if title_col not in df_jd.columns:
         raise KeyError(f"Missing required JD column: {title_col}")
 
@@ -164,6 +167,7 @@ def generate_mock_cvs_for_titles(
 
 
 def enrich_real_cvs(df_cv: pd.DataFrame, sample_size: int = 100) -> pd.DataFrame:
+    build_enrich_cv_prompt, _, generate_with_local_llm = require_localllm()
     df_real = df_cv.sample(n=min(sample_size, len(df_cv)), replace=False)
     enriched_real_cvs = []
 

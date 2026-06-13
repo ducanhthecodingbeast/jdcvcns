@@ -67,8 +67,8 @@ def main():
         conn = psycopg2.connect(get_database_url())
     except psycopg2.Error as e:
         print(f"❌ Error connecting to the database: {e}")
-        print("💡 The database container maps port 15566 on localhost. Please check that 'docker-db-1' is active.")
-        return
+        print("💡 The 2.0 database container maps port 15420 on localhost. Please check that the compose service is active.")
+        sys.exit(1)
 
     with conn.cursor() as cur:
         # Enable pgvector and create tables

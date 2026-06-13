@@ -11,6 +11,8 @@ PID_FILE="${RUN_PID:-${SCRIPT_DIR}/run.pid}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 VARIANT="${RUN_VARIANT:-all}"
 ENV_BM25_REGEX_TOKENIZER="${BM25_REGEX_TOKENIZER:-}"
+ENV_STORE_DB="${STORE_DB:-}"
+ENV_WRITE_RESULTS="${WRITE_RESULTS:-}"
 ENV_HF_HOME="${HF_HOME:-}"
 ENV_SENTENCE_TRANSFORMERS_HOME="${SENTENCE_TRANSFORMERS_HOME:-}"
 
@@ -159,6 +161,8 @@ if [[ -f "${LOCAL_ENV}" ]]; then
 fi
 
 export BM25_REGEX_TOKENIZER="${ENV_BM25_REGEX_TOKENIZER:-1}"
+if [[ -n "${ENV_STORE_DB}" ]]; then export STORE_DB="${ENV_STORE_DB}"; fi
+if [[ -n "${ENV_WRITE_RESULTS}" ]]; then export WRITE_RESULTS="${ENV_WRITE_RESULTS}"; fi
 export PYTHONDONTWRITEBYTECODE="${PYTHONDONTWRITEBYTECODE:-1}"
 HARDWARE_TARGET_PERCENT="${HARDWARE_TARGET_PERCENT:-95}"
 CPU_THREADS="${CPU_THREADS:-$(( ($(nproc 2>/dev/null || echo 1) * HARDWARE_TARGET_PERCENT + 99) / 100 ))}"
@@ -196,8 +200,12 @@ export SENTENCE_TRANSFORMERS_HOME="${ENV_SENTENCE_TRANSFORMERS_HOME:-${RUNTIME_C
 
 cd "${SCRIPT_DIR}"
 
-"${VENV_DIR}/bin/python" -m pip install --upgrade pip
-"${VENV_DIR}/bin/python" -m pip install -r "${SCRIPT_DIR}/requirements.txt"
+if [[ "${SKIP_PIP_INSTALL:-0}" == "1" ]]; then
+  echo "Skipping pip install because SKIP_PIP_INSTALL=1"
+else
+  "${VENV_DIR}/bin/python" -m pip install --upgrade pip
+  "${VENV_DIR}/bin/python" -m pip install -r "${SCRIPT_DIR}/requirements.txt"
+fi
 
 if [[ -f "${REPO_ROOT}/scripts/compose" ]]; then
   "${REPO_ROOT}/scripts/compose" up -d postgres
