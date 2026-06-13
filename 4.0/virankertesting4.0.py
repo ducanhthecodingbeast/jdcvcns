@@ -239,7 +239,39 @@ def connect_qdrant(config: Config):
     return QdrantClient(host=config.qdrant_host, port=config.qdrant_port, timeout=config.qdrant_timeout)
 
 
-def prepare_collection(client, config: Config, models) -> None:
+def qdrant_target(config: Config) -> str:
+    if config.qdrant_path:
+        return f"path={config.qdrant_path}"
+    if config.qdrant_url:
+        return config.qdrant_url
+    return f"{config.qdrant_host}:{config.qdrant_port}"
+
+
+def run_qdrant_startup_step(description: str, config: Config, step) -> Any:
+    deadline = time.monotonic() + config.qdrant_timeout
+    attempt = 1
+
+    while True:
+        try:
+            return step()
+        except Exception as exc:
+            if time.monotonic() >= deadline:
+                raise RuntimeError(
+                    f"Qdrant {description} failed after {config.qdrant_timeout:.0f}s "
+                    f"for {qdrant_target(config)}: {type(exc).__name__}: {exc}"
+                ) from exc
+
+            delay_seconds = min(2 ** attempt, 10)
+            print(
+                f"Qdrant {description} failed on attempt {attempt}: "
+                f"{type(exc).__name__}: {exc}. Retrying in {delay_seconds}s...",
+                file=sys.stderr,
+            )
+            time.sleep(delay_seconds)
+            attempt += 1
+
+
+def prepare_collection_once(client, config: Config, models) -> None:
     exists = client.collection_exists(config.collection_name)
     if exists and not config.recreate_collection:
         return
@@ -256,6 +288,15 @@ def prepare_collection(client, config: Config, models) -> None:
                 index=models.SparseIndexParams(on_disk=True),
             ),
         },
+    )
+
+
+def prepare_collection(client, config: Config, models) -> None:
+    run_qdrant_startup_step("startup check", config, client.get_collections)
+    run_qdrant_startup_step(
+        "collection setup",
+        config,
+        lambda: prepare_collection_once(client, config, models),
     )
 
 
