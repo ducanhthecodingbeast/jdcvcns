@@ -17,13 +17,10 @@ def normalize_pinecone_index_name(value: str) -> str:
 
 def require_pinecone():
     try:
+        from pinecone import Pinecone as PineconeClient
         from pinecone import ServerlessSpec
     except ImportError as exc:
         raise RuntimeError("Missing dependency: install pinecone to run with VECTOR_BACKEND=pinecone.") from exc
-    try:
-        from pinecone.grpc import PineconeGRPC as PineconeClient
-    except ImportError:
-        from pinecone import Pinecone as PineconeClient
     return PineconeClient, ServerlessSpec
 
 
