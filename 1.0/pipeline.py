@@ -96,11 +96,13 @@ def load_sentence_transformer(model_name: str):
     from sentence_transformers import SentenceTransformer
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Loading model {model_name} on device: {device.upper()}")
     try:
         return SentenceTransformer(model_name, device=device)
     except Exception as exc:
         message = str(exc).lower()
         if "out of memory" in message or "cuda" in message:
+            print(f"WARNING: Failed to load on {device}. Falling back to CPU. Error: {exc}")
             return SentenceTransformer(model_name, device="cpu")
         raise
 

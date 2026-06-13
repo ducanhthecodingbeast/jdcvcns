@@ -96,10 +96,12 @@ def main():
             
     if cv_embeddings is None or jd_embeddings is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
+        print(f"Loading AITeamVN/Vietnamese_Embedding_v2 on {device.upper()}")
         try:
             model = SentenceTransformer("AITeamVN/Vietnamese_Embedding_v2", device=device)
         except Exception as e:
             if "out of memory" in str(e).lower() or "cuda" in str(e).lower():
+                print(f"WARNING: Failed to load on {device}. Falling back to CPU. Error: {e}")
                 model = SentenceTransformer("AITeamVN/Vietnamese_Embedding_v2", device="cpu")
             else:
                 raise

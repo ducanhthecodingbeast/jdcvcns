@@ -737,8 +737,10 @@ def run_bgem3_qdrant(config: Config) -> dict[str, Any]:
     if df_cv.empty or df_jd.empty:
         raise ValueError("Both CV and JD datasets must contain at least one row.")
 
-    print(f"Initializing BGE-M3 model: {BGE_M3_MODEL}")
-    model = BGEM3FlagModel(BGE_M3_MODEL, use_fp16=config.use_fp16)
+    import torch
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Initializing BGE-M3 model: {BGE_M3_MODEL} on {device.upper()}")
+    model = BGEM3FlagModel(BGE_M3_MODEL, use_fp16=config.use_fp16, device=device)
 
     print("Connecting to Qdrant...")
     client = connect_qdrant(config)
@@ -836,8 +838,10 @@ def run_bgem3_pinecone(config: Config) -> dict[str, Any]:
     if df_cv.empty or df_jd.empty:
         raise ValueError("Both CV and JD datasets must contain at least one row.")
 
-    print(f"Initializing BGE-M3 model: {BGE_M3_MODEL}")
-    model = BGEM3FlagModel(BGE_M3_MODEL, use_fp16=config.use_fp16)
+    import torch
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Initializing BGE-M3 model: {BGE_M3_MODEL} on {device.upper()}")
+    model = BGEM3FlagModel(BGE_M3_MODEL, use_fp16=config.use_fp16, device=device)
 
     print(f"Connecting to Pinecone Local: {config.pinecone_host}")
     index = prepare_pinecone_index(
