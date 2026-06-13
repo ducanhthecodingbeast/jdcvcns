@@ -1,0 +1,28 @@
+#!/usr/bin/env sh
+set -eu
+
+CONTAINER_NAME="${PINECONE_LOCAL_CONTAINER:-jdcvcns-pinecone-local}"
+PORT_RANGE="${PINECONE_LOCAL_PORT_RANGE:-5080-5090}"
+ADVERTISE_HOST="${PINECONE_LOCAL_ADVERTISE_HOST:-localhost}"
+IMAGE="${PINECONE_LOCAL_IMAGE:-ghcr.io/pinecone-io/pinecone-local:latest}"
+
+if docker ps --format '{{.Names}}' | grep -qx "${CONTAINER_NAME}"; then
+  echo "Pinecone Local is already running: ${CONTAINER_NAME}"
+  exit 0
+fi
+
+if docker ps -a --format '{{.Names}}' | grep -qx "${CONTAINER_NAME}"; then
+  docker start "${CONTAINER_NAME}" >/dev/null
+  echo "Started existing Pinecone Local container: ${CONTAINER_NAME}"
+  exit 0
+fi
+
+docker run -d \
+  --name "${CONTAINER_NAME}" \
+  -e PORT=5080 \
+  -e PINECONE_HOST="${ADVERTISE_HOST}" \
+  -p "${PORT_RANGE}:5080-5090" \
+  --platform linux/amd64 \
+  "${IMAGE}" >/dev/null
+
+echo "Started Pinecone Local container: ${CONTAINER_NAME}"

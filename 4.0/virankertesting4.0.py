@@ -15,6 +15,9 @@ from typing import Any, Iterable
 PROJECT_ROOT = Path(__file__).resolve().parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+REPO_ROOT = PROJECT_ROOT.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 os.environ.setdefault("HF_HOME", str(PROJECT_ROOT / ".cache" / "huggingface"))
 os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", str(PROJECT_ROOT / ".cache" / "sentence-transformers"))
 
@@ -23,6 +26,20 @@ import pandas as pd
 from tqdm import tqdm
 
 from pipeline import DATASET_DIR, RESULTS_DIR, get_cv_text, get_jd_text, load_datasets
+from pinecone_backend import (
+    normalize_dense_vector,
+    normalize_pinecone_index_name,
+    pinecone_hybrid_vectors,
+    pinecone_match_id,
+    pinecone_match_metadata,
+    pinecone_match_score,
+    pinecone_matches,
+    pinecone_metadata,
+    pinecone_query,
+    pinecone_sparse_payload,
+    pinecone_upsert_with_retry,
+    prepare_pinecone_index,
+)
 from testingresult import RunInfo, env_flag, open_store, store_match_run
 
 
@@ -47,6 +64,7 @@ def env_optional_int(name: str, default: int | None = None) -> int | None:
 class Config:
     dataset_dir: Path
     results_dir: Path
+    vector_backend: str
     collection_name: str
     top_k: int
     batch_size: int
@@ -64,6 +82,14 @@ class Config:
     qdrant_path: str | None
     qdrant_timeout: float
     qdrant_upsert_retries: int
+    pinecone_index: str
+    pinecone_host: str
+    pinecone_index_host: str | None
+    pinecone_api_key: str | None
+    pinecone_cloud: str
+    pinecone_region: str
+    pinecone_namespace: str | None
+    pinecone_alpha: float
     store_db: bool
     write_results: bool
 
@@ -74,6 +100,11 @@ def parse_args() -> Config:
     )
     parser.add_argument("--dataset-dir", default=str(DATASET_DIR))
     parser.add_argument("--results-dir", default=str(RESULTS_DIR))
+    parser.add_argument(
+        "--vector-backend",
+        choices=("qdrant", "pinecone"),
+        default=os.environ.get("VECTOR_BACKEND", "qdrant").lower(),
+    )
     parser.add_argument("--collection", default=os.environ.get("QDRANT_COLLECTION", DEFAULT_COLLECTION))
     parser.add_argument("--top-k", type=int, default=env_int("TOP_K", 10))
     parser.add_argument("--batch-size", type=int, default=env_int("BGE_BATCH_SIZE", 16))
@@ -97,6 +128,17 @@ def parse_args() -> Config:
     parser.add_argument("--qdrant-path", default=os.environ.get("QDRANT_PATH"))
     parser.add_argument("--qdrant-timeout", type=float, default=float(os.environ.get("QDRANT_TIMEOUT", "120")))
     parser.add_argument("--qdrant-upsert-retries", type=int, default=env_int("QDRANT_UPSERT_RETRIES", 3))
+    parser.add_argument(
+        "--pinecone-index",
+        default=os.environ.get("PINECONE_INDEX", normalize_pinecone_index_name(DEFAULT_COLLECTION)),
+    )
+    parser.add_argument("--pinecone-host", default=os.environ.get("PINECONE_HOST", "http://localhost:5080"))
+    parser.add_argument("--pinecone-index-host", default=os.environ.get("PINECONE_INDEX_HOST"))
+    parser.add_argument("--pinecone-api-key", default=os.environ.get("PINECONE_API_KEY"))
+    parser.add_argument("--pinecone-cloud", default=os.environ.get("PINECONE_CLOUD", "aws"))
+    parser.add_argument("--pinecone-region", default=os.environ.get("PINECONE_REGION", "us-east-1"))
+    parser.add_argument("--pinecone-namespace", default=os.environ.get("PINECONE_NAMESPACE", ""))
+    parser.add_argument("--pinecone-alpha", type=float, default=float(os.environ.get("PINECONE_ALPHA", "0.75")))
     args = parser.parse_args()
     query_max_length = args.reranker_query_max_length
     if query_max_length is not None and query_max_length <= 0:
@@ -105,6 +147,7 @@ def parse_args() -> Config:
     return Config(
         dataset_dir=Path(args.dataset_dir),
         results_dir=Path(args.results_dir),
+        vector_backend=args.vector_backend,
         collection_name=args.collection,
         top_k=max(1, args.top_k),
         batch_size=max(1, args.batch_size),
@@ -122,6 +165,14 @@ def parse_args() -> Config:
         qdrant_path=args.qdrant_path,
         qdrant_timeout=max(1.0, args.qdrant_timeout),
         qdrant_upsert_retries=max(1, args.qdrant_upsert_retries),
+        pinecone_index=normalize_pinecone_index_name(args.pinecone_index),
+        pinecone_host=args.pinecone_host,
+        pinecone_index_host=args.pinecone_index_host,
+        pinecone_api_key=args.pinecone_api_key,
+        pinecone_cloud=args.pinecone_cloud,
+        pinecone_region=args.pinecone_region,
+        pinecone_namespace=args.pinecone_namespace or None,
+        pinecone_alpha=min(1.0, max(0.0, args.pinecone_alpha)),
         store_db=env_flag("STORE_DB", True),
         write_results=env_flag("WRITE_RESULTS", True) and not args.no_write_results,
     )
@@ -508,6 +559,133 @@ def match_cvs(client, model, df_cv: pd.DataFrame, config: Config, models) -> lis
     return matches
 
 
+def index_jobs_pinecone(index, model, df_jd: pd.DataFrame, config: Config) -> None:
+    jd_texts = [get_jd_text(row) for _, row in df_jd.iterrows()]
+    progress = tqdm(total=len(jd_texts), desc="Indexing JDs")
+
+    for start, text_batch in chunks(jd_texts, config.batch_size):
+        output = encode_batch(model, text_batch, config.batch_size)
+        records = []
+
+        for offset, text in enumerate(text_batch):
+            jd_idx = start + offset
+            jd_row = df_jd.iloc[jd_idx]
+            records.append(
+                {
+                    "id": str(jd_idx),
+                    "values": normalize_dense_vector(output["dense_vecs"][offset]),
+                    "sparse_values": pinecone_sparse_payload(output["lexical_weights"][offset]),
+                    "metadata": pinecone_metadata(
+                        {
+                            **row_payload(jd_row),
+                            "_text": text,
+                        }
+                    ),
+                }
+            )
+
+        for _, record_batch in chunks(records, config.upsert_batch_size):
+            pinecone_upsert_with_retry(
+                index,
+                record_batch,
+                namespace=config.pinecone_namespace,
+                retries=config.qdrant_upsert_retries,
+            )
+        progress.update(len(text_batch))
+
+    progress.close()
+
+
+def match_cvs_pinecone(index, model, df_cv: pd.DataFrame, config: Config) -> list[dict[str, Any]]:
+    print(
+        f"Initializing ViRanker model: {VIRANKER_MODEL} "
+        f"(max_length={config.reranker_max_length}, batch_size={config.reranker_batch_size}, "
+        f"normalize={config.reranker_normalize})"
+    )
+    reranker = build_reranker(config)
+
+    cv_texts = [get_cv_text(row) for _, row in df_cv.iterrows()]
+    matches: list[dict[str, Any]] = []
+    prefetch_limit = max(config.top_k, config.top_k * config.prefetch_multiplier)
+    progress = tqdm(total=len(cv_texts), desc="Matching CVs")
+
+    for start, text_batch in chunks(cv_texts, config.batch_size):
+        output = encode_batch(model, text_batch, config.batch_size)
+
+        for offset, cv_text in enumerate(text_batch):
+            cv_idx = start + offset
+            cv_row = df_cv.iloc[cv_idx]
+            dense, sparse = pinecone_hybrid_vectors(
+                output["dense_vecs"][offset],
+                pinecone_sparse_payload(output["lexical_weights"][offset]),
+                config.pinecone_alpha,
+            )
+
+            response = pinecone_query(
+                index,
+                namespace=config.pinecone_namespace,
+                top_k=prefetch_limit,
+                dense_vector=dense,
+                sparse_vector=sparse,
+                include_metadata=True,
+            )
+
+            candidates = []
+            for retrieval_rank, result in enumerate(pinecone_matches(response), start=1):
+                jd_payload = pinecone_match_metadata(result)
+                jd_text = jd_payload.get("_text", "")
+                candidates.append((retrieval_rank, result, jd_payload, jd_text))
+
+            if not candidates:
+                continue
+
+            pairs = [[cv_text, c[3]] for c in candidates]
+            scores = compute_reranker_scores(reranker, pairs, config)
+            if len(scores) != len(candidates):
+                raise RuntimeError(
+                    f"ViRanker returned {len(scores)} scores for {len(candidates)} candidate pairs."
+                )
+
+            scored_candidates = []
+            for score, (retrieval_rank, result, jd_payload, _) in zip(scores, candidates):
+                scored_candidates.append(
+                    {
+                        "jd_id": int(pinecone_match_id(result)),
+                        "score": float(score),
+                        "retrieval_rank": int(retrieval_rank),
+                        "retrieval_score": pinecone_match_score(result),
+                        "jd_payload": jd_payload,
+                    }
+                )
+
+            scored_candidates.sort(key=lambda x: x["score"], reverse=True)
+            top_candidates = scored_candidates[: config.top_k]
+
+            cv_title = first_value(cv_row, "Tên ứng viên", "Vị trí ứng tuyển", "User Name", "Desired Job")
+            for rank, cand in enumerate(top_candidates, start=1):
+                jd_payload = cand["jd_payload"]
+                matches.append(
+                    {
+                        "cv_id": int(cv_idx),
+                        "cv_title": cv_title,
+                        "jd_id": cand["jd_id"],
+                        "jd_title": first_payload_value(jd_payload, "Vị trí cần tuyển", "Job Title"),
+                        "rank": rank,
+                        "score": cand["score"],
+                        "score_type": "sigmoid" if config.reranker_normalize else "raw",
+                        "retrieval_rank": cand["retrieval_rank"],
+                        "retrieval_score": cand["retrieval_score"],
+                        "cv_payload": row_payload(cv_row),
+                        "jd_payload": {key: value for key, value in jd_payload.items() if key != "_text"},
+                    }
+                )
+
+        progress.update(len(text_batch))
+
+    progress.close()
+    return matches
+
+
 def first_value(row: pd.Series, *names: str) -> str:
     for name in names:
         if name in row and pd.notna(row[name]) and str(row[name]).strip():
@@ -647,9 +825,119 @@ def run_bgem3_qdrant(config: Config) -> dict[str, Any]:
     }
 
 
+def run_bgem3_pinecone(config: Config) -> dict[str, Any]:
+    started_wall = time.time()
+    started_monotonic = time.monotonic()
+    BGEM3FlagModel = require_bgem3_model()
+    configure_torch_runtime()
+
+    print("Loading datasets...")
+    df_cv, df_jd = load_datasets(config.dataset_dir)
+    if df_cv.empty or df_jd.empty:
+        raise ValueError("Both CV and JD datasets must contain at least one row.")
+
+    print(f"Initializing BGE-M3 model: {BGE_M3_MODEL}")
+    model = BGEM3FlagModel(BGE_M3_MODEL, use_fp16=config.use_fp16)
+
+    print(f"Connecting to Pinecone Local: {config.pinecone_host}")
+    index = prepare_pinecone_index(
+        api_key=config.pinecone_api_key,
+        index_name=config.pinecone_index,
+        host=config.pinecone_host,
+        index_host=config.pinecone_index_host,
+        cloud=config.pinecone_cloud,
+        region=config.pinecone_region,
+        recreate_index=config.recreate_collection,
+        timeout=config.qdrant_timeout,
+    )
+
+    index_jobs_pinecone(index, model, df_jd, config)
+    matches = match_cvs_pinecone(index, model, df_cv, config)
+
+    run_id = None
+    if config.store_db:
+        expected_top_k = min(config.top_k, len(df_jd))
+        matches_by_cv: dict[int, list[dict[str, Any]]] = {}
+        for match in matches:
+            matches_by_cv.setdefault(int(match["cv_id"]), []).append(match)
+
+        def ranked_matches(cv_idx: int) -> list[dict[str, Any]]:
+            return [
+                {
+                    "jd_idx": int(match["jd_id"]),
+                    "rank": int(match["rank"]),
+                    "score": float(match["score"]),
+                    "meta": {
+                        "source": "pinecone_hybrid_viranker",
+                        "score_type": match.get("score_type"),
+                        "retrieval_rank": match.get("retrieval_rank"),
+                        "retrieval_score": match.get("retrieval_score"),
+                        "reranker_model": VIRANKER_MODEL,
+                        "reranker_max_length": config.reranker_max_length,
+                        "reranker_query_max_length": config.reranker_query_max_length,
+                    },
+                }
+                for match in sorted(matches_by_cv.get(cv_idx, []), key=lambda item: item["rank"])
+            ]
+
+        conn = open_store()
+        try:
+            run_id = store_match_run(
+                conn,
+                RunInfo(
+                    run_name="virankertesting4.0",
+                    algorithm="pinecone_hybrid_viranker",
+                    model_name=f"{BGE_M3_MODEL} -> {VIRANKER_MODEL}",
+                    params={
+                        "top_k": config.top_k,
+                        "batch_size": config.batch_size,
+                        "upsert_batch_size": config.upsert_batch_size,
+                        "reranker_batch_size": config.reranker_batch_size,
+                        "reranker_max_length": config.reranker_max_length,
+                        "reranker_query_max_length": config.reranker_query_max_length,
+                        "reranker_normalize": config.reranker_normalize,
+                        "prefetch_multiplier": config.prefetch_multiplier,
+                        "pinecone_index": config.pinecone_index,
+                        "pinecone_namespace": config.pinecone_namespace,
+                        "pinecone_alpha": config.pinecone_alpha,
+                        "retriever_model": BGE_M3_MODEL,
+                        "reranker_model": VIRANKER_MODEL,
+                    },
+                    dataset_meta={
+                        "dataset_dir": str(config.dataset_dir),
+                        "cv_rows": len(df_cv),
+                        "jd_rows": len(df_jd),
+                    },
+                ),
+                df_cv,
+                df_jd,
+                get_cv_text,
+                get_jd_text,
+                ranked_matches,
+                top_k=expected_top_k,
+                started_monotonic=started_monotonic,
+            )
+        finally:
+            conn.close()
+
+    result_path = write_match_summary(matches, config, run_id)
+
+    return {
+        "cv_count": len(df_cv),
+        "jd_count": len(df_jd),
+        "match_count": len(matches),
+        "run_id": run_id,
+        "result_path": result_path,
+        "elapsed_seconds": round(time.time() - started_wall, 3),
+    }
+
+
 def main() -> None:
     config = parse_args()
-    result = run_bgem3_qdrant(config)
+    if config.vector_backend == "pinecone":
+        result = run_bgem3_pinecone(config)
+    else:
+        result = run_bgem3_qdrant(config)
     print(
         f"Matched {result['cv_count']} CVs against {result['jd_count']} JDs "
         f"({result['match_count']} rows) in {result['elapsed_seconds']}s. "

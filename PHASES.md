@@ -81,3 +81,16 @@ Reset all markers for a run id:
 - `Dataset/run.sh --check-only` validates existing `Data/jd.csv`, `Data/cv.csv`, and `Data/mockcv.csv` without Kaggle or local LLM generation.
 - `STORE_DB=0`, `WRITE_RESULTS=0`, and `QDRANT_PATH=:memory:` can be passed from the shell and will override `.env.local` for smoke tests.
 - `SKIP_PIP_INSTALL=1` skips dependency installation when the environment is already prepared.
+
+## Pinecone Local Instead Of Qdrant
+
+Use Pinecone Local for the vector phases without resetting completed markers:
+
+```bash
+export VECTOR_BACKEND=pinecone
+export PINECONE_HOST=http://localhost:5080
+./run_all.sh --background
+tail -f .phase_state/default/run.log
+```
+
+This starts a shared in-memory Docker container named `jdcvcns-pinecone-local` and skips Qdrant for phases `4.0` and `3.0`. Pinecone Local does not persist records after the container is removed.

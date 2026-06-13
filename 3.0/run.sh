@@ -15,6 +15,13 @@ ENV_QDRANT_PORT="${QDRANT_PORT:-}"
 ENV_QDRANT_URL="${QDRANT_URL:-}"
 ENV_QDRANT_PATH="${QDRANT_PATH:-}"
 ENV_STORE_DB="${STORE_DB:-}"
+ENV_VECTOR_BACKEND="${VECTOR_BACKEND:-}"
+ENV_PINECONE_HOST="${PINECONE_HOST:-}"
+ENV_PINECONE_INDEX_HOST="${PINECONE_INDEX_HOST:-}"
+ENV_PINECONE_API_KEY="${PINECONE_API_KEY:-}"
+ENV_PINECONE_INDEX="${PINECONE_INDEX:-}"
+ENV_PINECONE_NAMESPACE="${PINECONE_NAMESPACE:-}"
+ENV_PINECONE_ALPHA="${PINECONE_ALPHA:-}"
 ENV_HF_HOME="${HF_HOME:-}"
 ENV_SENTENCE_TRANSFORMERS_HOME="${SENTENCE_TRANSFORMERS_HOME:-}"
 
@@ -135,6 +142,13 @@ fi
 export QDRANT_UPSERT_BATCH_SIZE="${ENV_QDRANT_UPSERT_BATCH_SIZE:-1}"
 export QDRANT_TIMEOUT="${ENV_QDRANT_TIMEOUT:-300}"
 export QDRANT_UPSERT_RETRIES="${QDRANT_UPSERT_RETRIES:-3}"
+export VECTOR_BACKEND="${ENV_VECTOR_BACKEND:-${VECTOR_BACKEND:-qdrant}}"
+export PINECONE_HOST="${ENV_PINECONE_HOST:-${PINECONE_HOST:-http://localhost:5080}}"
+if [[ -n "${ENV_PINECONE_INDEX_HOST}" ]]; then export PINECONE_INDEX_HOST="${ENV_PINECONE_INDEX_HOST}"; fi
+if [[ -n "${ENV_PINECONE_API_KEY}" ]]; then export PINECONE_API_KEY="${ENV_PINECONE_API_KEY}"; fi
+if [[ -n "${ENV_PINECONE_INDEX}" ]]; then export PINECONE_INDEX="${ENV_PINECONE_INDEX}"; fi
+if [[ -n "${ENV_PINECONE_NAMESPACE}" ]]; then export PINECONE_NAMESPACE="${ENV_PINECONE_NAMESPACE}"; fi
+if [[ -n "${ENV_PINECONE_ALPHA}" ]]; then export PINECONE_ALPHA="${ENV_PINECONE_ALPHA}"; fi
 if [[ -n "${ENV_QDRANT_HOST}" ]]; then export QDRANT_HOST="${ENV_QDRANT_HOST}"; fi
 if [[ -n "${ENV_QDRANT_PORT}" ]]; then export QDRANT_PORT="${ENV_QDRANT_PORT}"; fi
 if [[ -n "${ENV_QDRANT_URL}" ]]; then export QDRANT_URL="${ENV_QDRANT_URL}"; fi
@@ -184,7 +198,12 @@ else
 fi
 
 if [[ -f "${REPO_ROOT}/scripts/compose" ]]; then
-  "${REPO_ROOT}/scripts/compose" up -d
+  if [[ "${VECTOR_BACKEND}" == "pinecone" ]]; then
+    "${REPO_ROOT}/scripts/compose" up -d postgres
+    "${REPO_ROOT}/scripts/pinecone_local"
+  else
+    "${REPO_ROOT}/scripts/compose" up -d postgres qdrant
+  fi
 fi
 
 "${VENV_DIR}/bin/python" "${SCRIPT_DIR}/bgmewdranttesting3.0.py" "${RUN_ARGS[@]}"

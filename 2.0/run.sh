@@ -150,7 +150,7 @@ else
 fi
 
 if [[ -f "${REPO_ROOT}/scripts/compose" ]]; then
-  "${REPO_ROOT}/scripts/compose" up -d
+  "${REPO_ROOT}/scripts/compose" up -d postgres
 fi
 
 case "${VARIANT}" in

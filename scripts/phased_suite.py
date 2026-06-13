@@ -52,12 +52,12 @@ PHASES: dict[str, Phase] = {
     "4.0": Phase(
         name="4.0",
         command=["./4.0/run.sh"],
-        description="Run version 4.0 Qdrant hybrid retrieval with ViRanker reranking.",
+        description="Run version 4.0 hybrid retrieval with ViRanker reranking.",
     ),
     "3.0": Phase(
         name="3.0",
         command=["./3.0/run.sh"],
-        description="Run version 3.0 BGE-M3 hybrid Qdrant ranking.",
+        description="Run version 3.0 BGE-M3 hybrid vector ranking.",
     ),
     "6.0": Phase(
         name="6.0",
