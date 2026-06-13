@@ -116,6 +116,19 @@ def get_model_value(model: Any, key: str, default: Any = None) -> Any:
     return getattr(model, key, default)
 
 
+def pinecone_is_local_host(host: str | None) -> bool:
+    if not host:
+        return False
+    lowered = host.lower()
+    return "localhost" in lowered or "127.0.0.1" in lowered or "[::1]" in lowered
+
+
+def pinecone_http_local_host(host: str) -> str:
+    if host.startswith(("http://", "https://")):
+        return host.replace("https://", "http://", 1)
+    return f"http://{host}"
+
+
 def pinecone_index_ready(description: Any) -> bool:
     status = get_model_value(description, "status", {})
     return bool(get_model_value(status, "ready", False))
@@ -166,6 +179,8 @@ def prepare_pinecone_index(
     pc = Pinecone(**kwargs)
 
     if index_host:
+        if pinecone_is_local_host(host) or pinecone_is_local_host(index_host):
+            index_host = pinecone_http_local_host(index_host)
         return pc.Index(host=index_host)
 
     if recreate_index and pinecone_has_index(pc, index_name):
@@ -187,6 +202,9 @@ def prepare_pinecone_index(
         )
     description = wait_for_pinecone_index(pc, index_name, timeout)
     validate_pinecone_index(description, index_name, dimension)
+    description_host = get_model_value(description, "host")
+    if description_host and pinecone_is_local_host(host):
+        return pc.Index(host=pinecone_http_local_host(str(description_host)))
     index = pc.Index(index_name)
 
     return index
