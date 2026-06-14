@@ -20,19 +20,22 @@ app.add_middleware(
 VERSION_SOURCES = [
     {
         "version": "3.0",
-        "label": "3.0 BGE-M3 Qdrant",
+        "label": "3.0 BGE-M3 Pinecone",
+        "url_env": "DEMO_DATABASE_URL_30",
         "port_env": "DEMO_POSTGRES_30_PORT",
         "default_port": "15430",
     },
     {
         "version": "4.0",
         "label": "4.0 BGE-M3 + ViRanker",
+        "url_env": "DEMO_DATABASE_URL_40",
         "port_env": "DEMO_POSTGRES_40_PORT",
         "default_port": "15440",
     },
     {
         "version": "6.0",
         "label": "6.x JobBERT + BM25",
+        "url_env": "DEMO_DATABASE_URL_60",
         "port_env": "DEMO_POSTGRES_60_PORT",
         "default_port": "15600",
     },
@@ -66,6 +69,12 @@ def source_config(version: str) -> dict[str, str]:
 
 def get_database_url(source: dict[str, str] | None = None) -> str:
     source = VERSION_SOURCES[0] if source is None else source
+    source_url = os.environ.get(source.get("url_env", ""), "").strip()
+    if source_url:
+        return source_url
+    database_url = os.environ.get("DATABASE_URL", "").strip()
+    if database_url:
+        return database_url
     host = os.environ.get("POSTGRES_HOST", "localhost")
     port = os.environ.get(source["port_env"], source["default_port"])
     user = os.environ.get("POSTGRES_USER", "jdcvcns")
@@ -240,4 +249,4 @@ def benchmark_summary():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("DEMO_BACKEND_PORT", "18000")))

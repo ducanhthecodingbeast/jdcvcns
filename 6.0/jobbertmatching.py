@@ -157,7 +157,7 @@ def parse_args(run_name: str, algorithm: str) -> Config:
         bm25_b=min(1.0, max(0.0, args.bm25_b)),
         regex_tokenizer=args.regex_tokenizer or env_flag("BM25_REGEX_TOKENIZER", False),
         store_db=env_flag("STORE_DB", True) and not args.no_store_db,
-        write_results=env_flag("WRITE_RESULTS", True) and not args.no_write_results,
+        write_results=env_flag("WRITE_RESULTS", False) and not args.no_write_results,
     )
 
 

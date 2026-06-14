@@ -1,5 +1,7 @@
 .phase_state/
 .ruff_cache/
+.cache/
+*/.cache/
 __pycache__/
 *.pyc
 tbfsv/

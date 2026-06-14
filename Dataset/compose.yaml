@@ -12,7 +12,7 @@ services:
       KAGGLE_KEY: ${KAGGLE_KEY:-}
       HF_HOME: /workspace/.cache/huggingface
       SENTENCE_TRANSFORMERS_HOME: /workspace/.cache/sentence-transformers
-      OLLAMA_GENERATE_URL: ${OLLAMA_GENERATE_URL:-http://host.docker.internal:11434/api/generate}
+      OLLAMA_GENERATE_URL: ${OLLAMA_GENERATE_URL:-http://host.docker.internal:16434/api/generate}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3.5:9b}
       OLLAMA_TIMEOUT_SECONDS: ${OLLAMA_TIMEOUT_SECONDS:-120}
       MOCKCV_ARGS: ${MOCKCV_ARGS:---force}
@@ -47,7 +47,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      OLLAMA_GENERATE_URL: ${OLLAMA_GENERATE_URL:-http://host.docker.internal:11434/api/generate}
+      OLLAMA_GENERATE_URL: ${OLLAMA_GENERATE_URL:-http://host.docker.internal:16434/api/generate}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3.5:9b}
       OLLAMA_TIMEOUT_SECONDS: ${OLLAMA_TIMEOUT_SECONDS:-120}
       MOCKCV_ARGS: ${MOCKCV_ARGS:---check-only}

@@ -1,6 +1,6 @@
 # 3.0 independent test project
 
-Goal: run `bgmewdranttesting3.0.py` as a complete version-3 test project with local PostgreSQL result storage and Qdrant retrieval setup.
+Goal: run `bgmewdranttesting3.0.py` as a complete version-3 test project with local PostgreSQL result storage and Pinecone hybrid retrieval setup.
 
 Shared exceptions:
 - Data files are read from `../Data`: `jd.csv`, `cv.csv`, `mockcv.csv`.
@@ -28,9 +28,11 @@ cd 3.0
 ./run.sh
 ```
 
-`run.sh` defaults to safer Qdrant write settings:
+`run.sh` defaults to Pinecone Local on project subports and conservative vector write settings:
 
 ```bash
+VECTOR_BACKEND=pinecone
+PINECONE_HOST=http://localhost:15080
 QDRANT_UPSERT_BATCH_SIZE=1 QDRANT_TIMEOUT=300
 ```
 
@@ -42,7 +44,7 @@ cd 3.0
 ```
 
 Core files:
-- `bgmewdranttesting3.0.py`: BGE-M3 + Qdrant test entrypoint.
+- `bgmewdranttesting3.0.py`: BGE-M3 + Pinecone hybrid test entrypoint.
 - `pipeline.py`: version-local dataset/text helpers.
 - `testingresult.py`, `demoAPI/`: version-local PostgreSQL result storage.
 

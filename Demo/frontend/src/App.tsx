@@ -69,7 +69,7 @@ interface RunResult {
   matches: Match[];
 }
 
-const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api';
+const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:18000/api';
 const targetSources = ['3.0', '4.0', '6.0'];
 
 function formatNumber(value: unknown): string {
@@ -224,7 +224,7 @@ function App() {
               <div>
                 <h1 className="display-md">Testing Results for 3.0, 4.0, and 6.x</h1>
                 <p className="body" style={{ color: 'var(--ink-muted)', marginTop: 'var(--spacing-sm)' }}>
-                  Aggregates independent result stores from ports 15430, 15440, and 15600.
+                  Aggregates independent result stores from project subports 15430, 15440, and 15600.
                 </p>
               </div>
               <div className="summary-note">

@@ -28,7 +28,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-jdcvcns}
       STORE_DB: ${STORE_DB:-1}
       TOP_K: ${TOP_K:-10}
-      OLLAMA_GENERATE_URL: ${OLLAMA_GENERATE_URL:-http://host.docker.internal:11434/api/generate}
+      OLLAMA_GENERATE_URL: ${OLLAMA_GENERATE_URL:-http://host.docker.internal:16434/api/generate}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3.5:9b}
       OLLAMA_TIMEOUT_SECONDS: ${OLLAMA_TIMEOUT_SECONDS:-120}
     depends_on:

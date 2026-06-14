@@ -3,7 +3,9 @@ from __future__ import annotations
 # ruff: noqa: E402
 
 import argparse
+import hashlib
 import os
+import re
 import sys
 import time
 from dataclasses import dataclass
@@ -43,6 +45,7 @@ from testingresult import RunInfo, env_flag, open_store, store_match_run
 
 BGE_M3_MODEL = os.environ.get("BGE_M3_MODEL", "BAAI/bge-m3")
 DEFAULT_COLLECTION = "jd_bgem3_collection"
+EMBEDDING_CACHE_DIR = Path(os.environ.get("EMBEDDING_CACHE_DIR", PROJECT_ROOT / ".cache" / "embeddings"))
 
 
 @dataclass(frozen=True)
@@ -83,7 +86,7 @@ def parse_args() -> Config:
     parser.add_argument(
         "--vector-backend",
         choices=("qdrant", "pinecone"),
-        default=os.environ.get("VECTOR_BACKEND", "qdrant").lower(),
+        default=os.environ.get("VECTOR_BACKEND", "pinecone").lower(),
     )
     parser.add_argument("--collection", default=os.environ.get("QDRANT_COLLECTION", DEFAULT_COLLECTION))
     parser.add_argument("--top-k", type=int, default=int(os.environ.get("TOP_K", "5")))
@@ -110,7 +113,7 @@ def parse_args() -> Config:
         "--pinecone-index",
         default=os.environ.get("PINECONE_INDEX", normalize_pinecone_index_name(DEFAULT_COLLECTION)),
     )
-    parser.add_argument("--pinecone-host", default=os.environ.get("PINECONE_HOST", "http://localhost:5080"))
+    parser.add_argument("--pinecone-host", default=os.environ.get("PINECONE_HOST", "http://localhost:15080"))
     parser.add_argument("--pinecone-index-host", default=os.environ.get("PINECONE_INDEX_HOST"))
     parser.add_argument("--pinecone-api-key", default=os.environ.get("PINECONE_API_KEY"))
     parser.add_argument("--pinecone-cloud", default=os.environ.get("PINECONE_CLOUD", "aws"))
@@ -243,6 +246,82 @@ def chunks(items: list[Any], batch_size: int) -> Iterable[tuple[int, list[Any]]]
         yield start, items[start : start + batch_size]
 
 
+def safe_model_name(model_name: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_.-]+", "_", model_name).strip("_") or "model"
+
+
+def text_digest(texts: list[str], *, model_name: str, use_fp16: bool, return_colbert: bool) -> str:
+    digest = hashlib.sha256()
+    digest.update(model_name.encode("utf-8"))
+    digest.update(str(use_fp16).encode("ascii"))
+    digest.update(str(return_colbert).encode("ascii"))
+    for text in texts:
+        data = text.encode("utf-8", errors="ignore")
+        digest.update(str(len(data)).encode("ascii"))
+        digest.update(b"\0")
+        digest.update(data)
+        digest.update(b"\0")
+    return digest.hexdigest()[:16]
+
+
+def embedding_cache_dir() -> Path:
+    EMBEDDING_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    return EMBEDDING_CACHE_DIR
+
+
+def embedding_cache_path(config: Config, label: str, start: int, texts: list[str], return_colbert: bool) -> Path:
+    digest = text_digest(
+        texts,
+        model_name=BGE_M3_MODEL,
+        use_fp16=config.use_fp16,
+        return_colbert=return_colbert,
+    )
+    mode = "colbert" if return_colbert else "dense_sparse"
+    filename = f"{label}_{safe_model_name(BGE_M3_MODEL)}_{mode}_{start}_{len(texts)}_{digest}.npz"
+    return embedding_cache_dir() / filename
+
+
+def object_array(values: Iterable[Any]) -> np.ndarray:
+    values = list(values)
+    array = np.empty(len(values), dtype=object)
+    for idx, value in enumerate(values):
+        array[idx] = value
+    return array
+
+
+def save_encoded_batch(path: Path, output: dict[str, Any], return_colbert: bool) -> None:
+    payload = {
+        "dense_vecs": np.asarray(output["dense_vecs"], dtype=np.float32),
+        "lexical_weights": object_array(output["lexical_weights"]),
+    }
+    if return_colbert:
+        payload["colbert_vecs"] = object_array(
+            np.asarray(vector, dtype=np.float32) for vector in output["colbert_vecs"]
+        )
+    np.savez_compressed(path, **payload)
+
+
+def load_encoded_batch(path: Path, expected_count: int, return_colbert: bool) -> dict[str, Any] | None:
+    try:
+        with np.load(path, allow_pickle=True) as data:
+            dense_vecs = np.asarray(data["dense_vecs"], dtype=np.float32)
+            lexical_weights = list(data["lexical_weights"].tolist())
+            if dense_vecs.shape[0] != expected_count or len(lexical_weights) != expected_count:
+                return None
+            output: dict[str, Any] = {
+                "dense_vecs": dense_vecs,
+                "lexical_weights": lexical_weights,
+            }
+            if return_colbert:
+                colbert_vecs = list(data["colbert_vecs"].tolist())
+                if len(colbert_vecs) != expected_count:
+                    return None
+                output["colbert_vecs"] = [np.asarray(vector, dtype=np.float32) for vector in colbert_vecs]
+            return output
+    except Exception:
+        return None
+
+
 def connect_qdrant(config: Config):
     QdrantClient, _ = require_qdrant()
     if config.qdrant_path:
@@ -320,14 +399,35 @@ def prepare_collection(client, config: Config, models) -> None:
     )
 
 
-def encode_batch(model, texts: list[str], batch_size: int) -> dict[str, Any]:
+def encode_batch(model, texts: list[str], batch_size: int, *, return_colbert: bool) -> dict[str, Any]:
     return model.encode(
         texts,
         batch_size=batch_size,
         return_dense=True,
         return_sparse=True,
-        return_colbert_vecs=True,
+        return_colbert_vecs=return_colbert,
     )
+
+
+def load_or_encode_batch(
+    model,
+    texts: list[str],
+    config: Config,
+    *,
+    label: str,
+    start: int,
+    return_colbert: bool,
+) -> dict[str, Any]:
+    cache_path = embedding_cache_path(config, label, start, texts, return_colbert)
+    cached = load_encoded_batch(cache_path, len(texts), return_colbert)
+    if cached is not None:
+        print(f"Loaded {label} embeddings from {cache_path}")
+        return cached
+
+    output = encode_batch(model, texts, config.batch_size, return_colbert=return_colbert)
+    save_encoded_batch(cache_path, output, return_colbert)
+    print(f"Saved {label} embeddings to {cache_path}")
+    return output
 
 
 def upsert_points_with_retry(client, config: Config, points: list[Any]) -> None:
@@ -352,7 +452,14 @@ def index_jobs(client, model, df_jd: pd.DataFrame, config: Config, models) -> No
     progress = tqdm(total=len(jd_texts), desc="Indexing JDs")
 
     for start, text_batch in chunks(jd_texts, config.batch_size):
-        output = encode_batch(model, text_batch, config.batch_size)
+        output = load_or_encode_batch(
+            model,
+            text_batch,
+            config,
+            label="jd",
+            start=start,
+            return_colbert=True,
+        )
         points = []
 
         for offset, text in enumerate(text_batch):
@@ -388,7 +495,14 @@ def match_cvs(client, model, df_cv: pd.DataFrame, config: Config, models) -> lis
     progress = tqdm(total=len(cv_texts), desc="Matching CVs")
 
     for start, text_batch in chunks(cv_texts, config.batch_size):
-        output = encode_batch(model, text_batch, config.batch_size)
+        output = load_or_encode_batch(
+            model,
+            text_batch,
+            config,
+            label="cv",
+            start=start,
+            return_colbert=True,
+        )
 
         for offset, _ in enumerate(text_batch):
             cv_idx = start + offset
@@ -434,7 +548,14 @@ def index_jobs_pinecone(index, model, df_jd: pd.DataFrame, config: Config) -> No
     progress = tqdm(total=len(jd_texts), desc="Indexing JDs")
 
     for start, text_batch in chunks(jd_texts, config.batch_size):
-        output = encode_batch(model, text_batch, config.batch_size)
+        output = load_or_encode_batch(
+            model,
+            text_batch,
+            config,
+            label="jd",
+            start=start,
+            return_colbert=False,
+        )
         records = []
 
         for offset, text in enumerate(text_batch):
@@ -472,7 +593,14 @@ def match_cvs_pinecone(index, model, df_cv: pd.DataFrame, config: Config) -> lis
     progress = tqdm(total=len(cv_texts), desc="Matching CVs")
 
     for start, text_batch in chunks(cv_texts, config.batch_size):
-        output = encode_batch(model, text_batch, config.batch_size)
+        output = load_or_encode_batch(
+            model,
+            text_batch,
+            config,
+            label="cv",
+            start=start,
+            return_colbert=False,
+        )
 
         for offset, _ in enumerate(text_batch):
             cv_idx = start + offset
@@ -529,6 +657,15 @@ def first_payload_value(payload: dict[str, Any], *names: str) -> str:
     return ""
 
 
+def preflight_store_connection(config: Config) -> None:
+    if not config.store_db:
+        return
+    print("Checking PostgreSQL result store connection...")
+    conn = open_store()
+    conn.close()
+    print("PostgreSQL result store is reachable.")
+
+
 def run_bgem3_qdrant(config: Config) -> dict[str, Any]:
     started_wall = time.time()
     started_monotonic = time.monotonic()
@@ -540,6 +677,7 @@ def run_bgem3_qdrant(config: Config) -> dict[str, Any]:
     df_cv, df_jd = load_datasets(config.dataset_dir)
     if df_cv.empty or df_jd.empty:
         raise ValueError("Both CV and JD datasets must contain at least one row.")
+    preflight_store_connection(config)
 
     import torch
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -587,8 +725,13 @@ def run_bgem3_qdrant(config: Config) -> dict[str, Any]:
                         "qdrant_timeout": config.qdrant_timeout,
                         "qdrant_upsert_retries": config.qdrant_upsert_retries,
                         "collection": config.collection_name,
+                        "embedding_cache_dir": str(embedding_cache_dir()),
                     },
-                    dataset_meta={"dataset_dir": str(config.dataset_dir)},
+                    dataset_meta={
+                        "dataset_dir": str(config.dataset_dir),
+                        "cv_rows": len(df_cv),
+                        "jd_rows": len(df_jd),
+                    },
                 ),
                 df_cv,
                 df_jd,
@@ -620,6 +763,7 @@ def run_bgem3_pinecone(config: Config) -> dict[str, Any]:
     df_cv, df_jd = load_datasets(config.dataset_dir)
     if df_cv.empty or df_jd.empty:
         raise ValueError("Both CV and JD datasets must contain at least one row.")
+    preflight_store_connection(config)
 
     print(f"Initializing BGE-M3 model: {BGE_M3_MODEL}")
     model = BGEM3FlagModel(BGE_M3_MODEL, use_fp16=config.use_fp16)
@@ -673,8 +817,13 @@ def run_bgem3_pinecone(config: Config) -> dict[str, Any]:
                         "pinecone_index": config.pinecone_index,
                         "pinecone_namespace": config.pinecone_namespace,
                         "pinecone_alpha": config.pinecone_alpha,
+                        "embedding_cache_dir": str(embedding_cache_dir()),
                     },
-                    dataset_meta={"dataset_dir": str(config.dataset_dir)},
+                    dataset_meta={
+                        "dataset_dir": str(config.dataset_dir),
+                        "cv_rows": len(df_cv),
+                        "jd_rows": len(df_jd),
+                    },
                 ),
                 df_cv,
                 df_jd,

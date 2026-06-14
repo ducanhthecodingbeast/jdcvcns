@@ -1,0 +1,28 @@
+cv_id,cv_title,rank,jd_id,jd_title,score,score_type,retrieval_rank,retrieval_score
+0,Nguyễn Văn Phần Mềm,1,0,Software Engineer,34.13581466674805,bm25,1,34.13581466674805
+0,Nguyễn Văn Phần Mềm,2,2,Junior Backend Developer,18.623138427734375,bm25,2,18.623138427734375
+0,Nguyễn Văn Phần Mềm,3,1,Senior Software Engineer,18.207509994506836,bm25,3,18.207509994506836
+0,Nguyễn Văn Phần Mềm,4,4,Machine Learning Engineer,15.423203468322754,bm25,4,15.423203468322754
+0,Nguyễn Văn Phần Mềm,5,3,Data Scientist,12.019378662109375,bm25,5,12.019378662109375
+0,Nguyễn Văn Phần Mềm,6,5,Data Analyst,11.288885116577148,bm25,6,11.288885116577148
+0,Nguyễn Văn Phần Mềm,7,6,Marketing Manager,10.269756317138672,bm25,7,10.269756317138672
+0,Nguyễn Văn Phần Mềm,8,7,Digital Marketing Specialist,9.046772003173828,bm25,8,9.046772003173828
+0,Nguyễn Văn Phần Mềm,9,8,SEO Expert,8.93129825592041,bm25,9,8.93129825592041
+1,Trần Thị Dữ Liệu,1,3,Data Scientist,32.950958251953125,bm25,1,32.950958251953125
+1,Trần Thị Dữ Liệu,2,5,Data Analyst,30.722822189331055,bm25,2,30.722822189331055
+1,Trần Thị Dữ Liệu,3,1,Senior Software Engineer,18.23443603515625,bm25,3,18.23443603515625
+1,Trần Thị Dữ Liệu,4,0,Software Engineer,18.203571319580078,bm25,4,18.203571319580078
+1,Trần Thị Dữ Liệu,5,4,Machine Learning Engineer,17.023487091064453,bm25,5,17.023487091064453
+1,Trần Thị Dữ Liệu,6,2,Junior Backend Developer,12.532885551452637,bm25,6,12.532885551452637
+1,Trần Thị Dữ Liệu,7,6,Marketing Manager,10.440552711486816,bm25,7,10.440552711486816
+1,Trần Thị Dữ Liệu,8,8,SEO Expert,8.326396942138672,bm25,8,8.326396942138672
+1,Trần Thị Dữ Liệu,9,7,Digital Marketing Specialist,3.3437910079956055,bm25,9,3.3437910079956055
+2,Lê Văn Marketing,1,6,Marketing Manager,44.52286911010742,bm25,1,44.52286911010742
+2,Lê Văn Marketing,2,7,Digital Marketing Specialist,39.33184051513672,bm25,2,39.33184051513672
+2,Lê Văn Marketing,3,0,Software Engineer,12.424884796142578,bm25,3,12.424884796142578
+2,Lê Văn Marketing,4,5,Data Analyst,10.28557014465332,bm25,4,10.28557014465332
+2,Lê Văn Marketing,5,4,Machine Learning Engineer,9.836541175842285,bm25,5,9.836541175842285
+2,Lê Văn Marketing,6,1,Senior Software Engineer,9.526921272277832,bm25,6,9.526921272277832
+2,Lê Văn Marketing,7,2,Junior Backend Developer,8.419215202331543,bm25,7,8.419215202331543
+2,Lê Văn Marketing,8,8,SEO Expert,7.985389709472656,bm25,8,7.985389709472656
+2,Lê Văn Marketing,9,3,Data Scientist,6.8777265548706055,bm25,9,6.8777265548706055

@@ -4,7 +4,7 @@ import os
 import requests
 
 
-OLLAMA_GENERATE_URL = os.environ.get("OLLAMA_GENERATE_URL", "http://localhost:11434/api/generate")
+OLLAMA_GENERATE_URL = os.environ.get("OLLAMA_GENERATE_URL", "http://localhost:16434/api/generate")
 DEFAULT_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3.5:9b")
 DEFAULT_TIMEOUT_SECONDS = int(os.environ.get("OLLAMA_TIMEOUT_SECONDS", "120"))
 

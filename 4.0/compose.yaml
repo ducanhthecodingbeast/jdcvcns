@@ -12,6 +12,7 @@ services:
 
   qdrant:
     image: qdrant/qdrant:v1.12.5
+    profiles: ["qdrant"]
     ports:
       - "${QDRANT_HOST_PORT:-16340}:6333"
     volumes:
@@ -30,8 +31,15 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-jdcvcns}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jdcvcns_dev_password}
       POSTGRES_DB: ${POSTGRES_DB:-jdcvcns}
+      VECTOR_BACKEND: ${VECTOR_BACKEND:-pinecone}
       QDRANT_HOST: qdrant
       QDRANT_PORT: 6333
+      PINECONE_HOST: ${PINECONE_HOST:-http://host.docker.internal:15080}
+      PINECONE_INDEX_HOST: ${PINECONE_INDEX_HOST:-}
+      PINECONE_API_KEY: ${PINECONE_API_KEY:-}
+      PINECONE_INDEX: ${PINECONE_INDEX:-}
+      PINECONE_NAMESPACE: ${PINECONE_NAMESPACE:-}
+      PINECONE_ALPHA: ${PINECONE_ALPHA:-0.75}
       STORE_DB: ${STORE_DB:-1}
       TOP_K: ${TOP_K:-10}
       BGE_BATCH_SIZE: ${BGE_BATCH_SIZE:-64}
@@ -50,15 +58,15 @@ services:
       VIRANKER_MAX_LENGTH: ${VIRANKER_MAX_LENGTH:-1024}
       VIRANKER_QUERY_MAX_LENGTH: ${VIRANKER_QUERY_MAX_LENGTH:-384}
       VIRANKER_NORMALIZE: ${VIRANKER_NORMALIZE:-1}
-      WRITE_RESULTS: ${WRITE_RESULTS:-1}
+      WRITE_RESULTS: ${WRITE_RESULTS:-0}
       PREFETCH_MULTIPLIER: ${PREFETCH_MULTIPLIER:-4}
       BGE_M3_MODEL: ${BGE_M3_MODEL:-BAAI/bge-m3}
       VIRANKER_MODEL: ${VIRANKER_MODEL:-namdp-ptit/ViRanker}
     depends_on:
       postgres:
         condition: service_started
-      qdrant:
-        condition: service_started
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     command: >
       sh -lc "apt-get update && apt-get install -y build-essential
       && pip install --no-cache-dir -r requirements.txt

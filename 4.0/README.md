@@ -1,10 +1,10 @@
 # 4.0 independent test project
 
-Goal: run `virankertesting4.0.py` as a complete version-4 test project with local PostgreSQL result storage, Qdrant retrieval, and ViRanker reranking setup.
+Goal: run `virankertesting4.0.py` as a complete version-4 test project with local PostgreSQL result storage, Pinecone hybrid retrieval, and ViRanker reranking setup.
 
 This version follows the ViRanker design:
 - BGE-M3 encodes JDs/CVs for first-stage hybrid recall.
-- Qdrant combines dense and sparse recall with RRF.
+- Pinecone stores/query dense+sparse hybrid vectors for first-stage recall.
 - `namdp-ptit/ViRanker` reranks the recalled JD candidates as a Vietnamese cross-encoder.
 - ViRanker defaults to `max_length=1024`, matching the paper's training/evaluation setting.
 - Reranker scores are sigmoid-normalized by default for easier result comparison.
@@ -41,9 +41,11 @@ Pass runner arguments after the launcher flags:
 ./run.sh -- --raw-reranker-scores
 ```
 
-`run.sh` defaults to safer Qdrant write settings:
+`run.sh` defaults to Pinecone Local on project subports and conservative vector write settings:
 
 ```bash
+VECTOR_BACKEND=pinecone
+PINECONE_HOST=http://localhost:15080
 QDRANT_UPSERT_BATCH_SIZE=1 QDRANT_TIMEOUT=300
 ```
 
@@ -55,7 +57,7 @@ cd 4.0
 ```
 
 Core files:
-- `virankertesting4.0.py`: BGE-M3 + Qdrant + ViRanker test entrypoint.
+- `virankertesting4.0.py`: BGE-M3 + Pinecone + ViRanker test entrypoint.
 - `pipeline.py`: version-local dataset/text helpers.
 - `testingresult.py`, `demoAPI/`: version-local PostgreSQL result storage.
 
@@ -67,6 +69,6 @@ Key environment variables:
 - `VIRANKER_MAX_LENGTH`: reranker pair max length, default `1024`.
 - `VIRANKER_QUERY_MAX_LENGTH`: token budget reserved for the CV side, default `384`; set `0` to disable.
 - `VIRANKER_NORMALIZE`: use sigmoid-normalized reranker scores when `1`.
-- `WRITE_RESULTS`: write a lightweight CSV summary under `TestingResults/` when `1`.
+- `WRITE_RESULTS`: write a lightweight CSV summary under `TestingResults/` when `1`. Defaults to `0`; canonical results are stored in PostgreSQL.
 
 Follow-up agents can add API/frontend wrappers here, but should keep the version-4 runtime independent from the other folders.

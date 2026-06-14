@@ -49,6 +49,8 @@ Environment:
   RUN_346_HARDWARE_TARGET_PERCENT=95
   RUN_346_CPU_THREADS=auto
   CUDA_VISIBLE_DEVICES=0
+  VECTOR_BACKEND=pinecone       Used by 3.0/4.0. Set qdrant only for legacy override.
+  PINECONE_HOST=http://localhost:15080
   QDRANT_UPSERT_BATCH_SIZE=auto
   QDRANT_TIMEOUT=300
   BM25_REGEX_TOKENIZER=1
@@ -342,6 +344,8 @@ configure_hardware() {
 
   export RUN_346_MODE="${MODE}"
   export RUN_346_6_VARIANT="${SIX_VARIANT}"
+  export VECTOR_BACKEND="${VECTOR_BACKEND:-pinecone}"
+  export PINECONE_HOST="${PINECONE_HOST:-http://localhost:15080}"
   export OMP_NUM_THREADS="${OMP_NUM_THREADS:-${CPU_THREADS}}"
   export MKL_NUM_THREADS="${MKL_NUM_THREADS:-${CPU_THREADS}}"
   export OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-${CPU_THREADS}}"
@@ -444,7 +448,8 @@ preflight() {
   echo "Preflight OK."
   echo "Mode: ${MODE}"
   echo "Versions: ${VERSIONS[*]}"
-  echo "Qdrant writes: batch=${QDRANT_UPSERT_BATCH_SIZE}, timeout=${QDRANT_TIMEOUT}s"
+  echo "Vector backend: ${VECTOR_BACKEND}"
+  echo "Vector writes: batch=${QDRANT_UPSERT_BATCH_SIZE}, timeout=${QDRANT_TIMEOUT}s"
   echo "Hardware target: ${HARDWARE_TARGET_PERCENT}%"
   echo "CPU: threads=${CPU_THREADS}/${CPU_TOTAL}, cpuset=${CPUSET:-all}"
   echo "GPU: CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}, memory=${GPU_MEMORY_MIB} MiB, MPS active thread=${CUDA_MPS_ACTIVE_THREAD_PERCENTAGE}%"
@@ -493,6 +498,9 @@ run_version() {
   echo "=== Running ${version} ==="
 
   if [[ "${MODE}" == "docker" ]]; then
+    if [[ "${VECTOR_BACKEND}" == "pinecone" && ( "${version}" == "3.0" || "${version}" == "4.0" ) ]]; then
+      "${SCRIPT_DIR}/scripts/pinecone_local"
+    fi
     (cd "${SCRIPT_DIR}/${version}" && run_limited "${SCRIPT_DIR}/scripts/compose" run --rm test)
     return
   fi

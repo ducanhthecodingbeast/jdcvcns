@@ -1,0 +1,28 @@
+cv_id,cv_title,rank,jd_id,jd_title,score,score_type,retrieval_rank,retrieval_score
+0,Nguyễn Văn Phần Mềm,1,0,Software Engineer,0.975390071374038,sigmoid,1,1.0
+0,Nguyễn Văn Phần Mềm,2,1,Senior Software Engineer,0.0651275468396235,sigmoid,2,0.6666667
+0,Nguyễn Văn Phần Mềm,3,4,Machine Learning Engineer,0.01652955655765428,sigmoid,4,0.4
+0,Nguyễn Văn Phần Mềm,4,8,SEO Expert,0.0018675659778932803,sigmoid,6,0.26785713
+0,Nguyễn Văn Phần Mềm,5,2,Junior Backend Developer,0.0017683516861090472,sigmoid,3,0.5
+0,Nguyễn Văn Phần Mềm,6,3,Data Scientist,0.0013670256456563559,sigmoid,5,0.33333334
+0,Nguyễn Văn Phần Mềm,7,5,Data Analyst,0.0008969393236719383,sigmoid,7,0.26785713
+0,Nguyễn Văn Phần Mềm,8,7,Digital Marketing Specialist,0.00028910325640811867,sigmoid,8,0.21111111
+0,Nguyễn Văn Phần Mềm,9,6,Marketing Manager,6.657016376053811e-05,sigmoid,9,0.21111111
+1,Trần Thị Dữ Liệu,1,3,Data Scientist,0.8921873600393251,sigmoid,1,1.0
+1,Trần Thị Dữ Liệu,2,5,Data Analyst,0.15778464009816573,sigmoid,2,0.5833334
+1,Trần Thị Dữ Liệu,3,4,Machine Learning Engineer,0.04130730379300428,sigmoid,3,0.53333336
+1,Trần Thị Dữ Liệu,4,7,Digital Marketing Specialist,0.02346465669263196,sigmoid,9,0.2
+1,Trần Thị Dữ Liệu,5,8,SEO Expert,0.016785489890063697,sigmoid,8,0.22222222
+1,Trần Thị Dữ Liệu,6,1,Senior Software Engineer,0.01518904880798395,sigmoid,4,0.45
+1,Trần Thị Dữ Liệu,7,0,Software Engineer,0.012147170099805137,sigmoid,5,0.33333334
+1,Trần Thị Dữ Liệu,8,6,Marketing Manager,0.009974920824078677,sigmoid,6,0.26785713
+1,Trần Thị Dữ Liệu,9,2,Junior Backend Developer,0.00787670671658746,sigmoid,7,0.26785713
+2,Lê Văn Marketing,1,6,Marketing Manager,0.379205950318938,sigmoid,1,1.0
+2,Lê Văn Marketing,2,7,Digital Marketing Specialist,0.16277890579510693,sigmoid,2,0.6666667
+2,Lê Văn Marketing,3,8,SEO Expert,0.006797531550373377,sigmoid,4,0.4166667
+2,Lê Văn Marketing,4,2,Junior Backend Developer,0.005021149947632315,sigmoid,3,0.45
+2,Lê Văn Marketing,5,5,Data Analyst,0.001775260532105842,sigmoid,7,0.25396827
+2,Lê Văn Marketing,6,3,Data Scientist,0.0011030266413981568,sigmoid,8,0.25396827
+2,Lê Văn Marketing,7,4,Machine Learning Engineer,0.0004076525923157939,sigmoid,6,0.26666668
+2,Lê Văn Marketing,8,0,Software Engineer,0.00021318756129065197,sigmoid,9,0.225
+2,Lê Văn Marketing,9,1,Senior Software Engineer,0.0001063745841626834,sigmoid,5,0.325

@@ -9,6 +9,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Expose port and run the server
-EXPOSE 8000
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Expose project-specific API port and run the server
+EXPOSE 18000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "18000"]

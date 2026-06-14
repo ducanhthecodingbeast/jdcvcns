@@ -11,18 +11,51 @@ try:
     if not hasattr(transformers.PreTrainedTokenizerBase, "prepare_for_model"):
         def monkey_patch_prepare_for_model(self, ids, pair_ids=None, add_special_tokens=True, padding=False, truncation=False, max_length=None, **kwargs):
             if truncation == 'only_second' and max_length is not None and pair_ids is not None:
-                num_special = self.num_special_tokens_to_add(pair=True)
+                # Approximate num_special if num_special_tokens_to_add is missing
+                num_special = self.num_special_tokens_to_add(pair=True) if hasattr(self, 'num_special_tokens_to_add') else 3
                 max_pair_len = max_length - len(ids) - num_special
                 pair_ids = pair_ids[:max_pair_len] if max_pair_len > 0 else []
-            input_ids = self.build_inputs_with_special_tokens(ids, pair_ids) if add_special_tokens else (ids + (pair_ids if pair_ids else []))
+            
+            cls = self.cls_token_id if self.cls_token_id is not None else 0
+            sep = self.sep_token_id if self.sep_token_id is not None else 2
+            
+            if pair_ids is None:
+                input_ids = [cls] + ids + [sep] if add_special_tokens else ids
+                token_type_ids = [0] * len(input_ids)
+            else:
+                if type(self).__name__ in ["XLMRobertaTokenizer", "XLMRobertaTokenizerFast", "RobertaTokenizer", "RobertaTokenizerFast"]:
+                    input_ids = [cls] + ids + [sep, sep] + pair_ids + [sep] if add_special_tokens else ids + pair_ids
+                    token_type_ids = [0] * len(input_ids)
+                else:
+                    input_ids = [cls] + ids + [sep] + pair_ids + [sep] if add_special_tokens else ids + pair_ids
+                    token_type_ids = ([0] * (len(ids) + 2) + [1] * (len(pair_ids) + 1)) if add_special_tokens else ([0] * len(ids) + [1] * len(pair_ids))
+            
             res = {"input_ids": input_ids, "attention_mask": [1] * len(input_ids)}
             if "token_type_ids" in self.model_input_names:
-                try:
-                    res["token_type_ids"] = self.create_token_type_ids_from_sequences(ids, pair_ids) if add_special_tokens else ([0]*len(ids) + [1]*len(pair_ids if pair_ids else []))
-                except Exception:
-                    pass
+                res["token_type_ids"] = token_type_ids
             return res
         transformers.PreTrainedTokenizerBase.prepare_for_model = monkey_patch_prepare_for_model
+    # AutoModel dtype patch
+
+    import transformers
+    for model_class_name in ["AutoModel", "AutoModelForSequenceClassification"]:
+        if hasattr(transformers, model_class_name):
+            model_class = getattr(transformers, model_class_name)
+            original_from_pretrained = model_class.from_pretrained
+
+            def make_patched_from_pretrained(original):
+                @classmethod
+                def patched_from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
+                    if 'dtype' in kwargs:
+                        if 'torch_dtype' not in kwargs:
+                            kwargs['torch_dtype'] = kwargs.pop('dtype')
+                        else:
+                            kwargs.pop('dtype')
+                    return original.__func__(cls, pretrained_model_name_or_path, *model_args, **kwargs)
+
+                return patched_from_pretrained
+
+            model_class.from_pretrained = make_patched_from_pretrained(original_from_pretrained)
 except ImportError:
     pass
 
