@@ -71,6 +71,25 @@ def extract_job_title_from_link(link: str) -> str:
     return " ".join(words).strip()
 
 
+def clean_llm_title(title: str) -> str:
+    return title.replace("```text", "").replace("```", "").strip()
+
+
+def is_local_llm_available(url: str, model: str, timeout: int) -> bool:
+    try:
+        generate_with_local_llm(
+            "Return only this exact text: ok",
+            model=model,
+            url=url,
+            timeout=min(timeout, 10),
+        )
+        return True
+    except Exception as exc:
+        print(f"Local LLM unavailable at {url} using model {model}: {exc}")
+        print("Falling back to deterministic LinkedIn URL title extraction.")
+        return False
+
+
 def main():
     dataset_name = "asaniczka/1-3m-linkedin-jobs-and-skills-2024"
     
@@ -113,6 +132,11 @@ def main():
     DEFAULT_TIMEOUT_SECONDS = int(os.environ.get("OLLAMA_TIMEOUT_SECONDS", "120"))
 
     print("Extracting job titles using local LLM...")
+    use_local_llm = is_local_llm_available(
+        OLLAMA_GENERATE_URL,
+        DEFAULT_MODEL,
+        DEFAULT_TIMEOUT_SECONDS,
+    )
 
     prompt_template = """Analyze this LinkedIn job URL and return only the extracted job title.
 Do not include any other text or explanation.
@@ -150,17 +174,18 @@ Title: """
         link = row["job_link"]
         skills = row["skills"]
         prompt = prompt_template.format(link=link)
-        try:
-            title = generate_with_local_llm(
-                prompt,
-                model=DEFAULT_MODEL,
-                url=OLLAMA_GENERATE_URL,
-                timeout=DEFAULT_TIMEOUT_SECONDS,
-            )
-            title = title.replace("```text", "").replace("```", "").strip()
-        except Exception as exc:
-            tqdm.write(f"[LLM Error] Failed for '{link}': {exc}")
-            title = ""
+        title = ""
+        if use_local_llm:
+            try:
+                title = generate_with_local_llm(
+                    prompt,
+                    model=DEFAULT_MODEL,
+                    url=OLLAMA_GENERATE_URL,
+                    timeout=DEFAULT_TIMEOUT_SECONDS,
+                )
+                title = clean_llm_title(title)
+            except Exception as exc:
+                tqdm.write(f"[LLM Error] Failed for '{link}': {exc}")
 
         if not title:
             title = extract_job_title_from_link(link)
