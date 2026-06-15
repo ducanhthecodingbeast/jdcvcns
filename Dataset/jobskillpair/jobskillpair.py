@@ -1,9 +1,65 @@
-from pathlib import Path
+import re
 import subprocess
 import zipfile
+from pathlib import Path
+from urllib.parse import unquote, urlparse
+
 import pandas as pd
 from tqdm import tqdm
-from Dataset.localllm import generate_with_local_llm
+
+
+SENIORITY_WORDS = {
+    "apprentice",
+    "associate",
+    "intern",
+    "internship",
+    "jr",
+    "junior",
+    "lead",
+    "principal",
+    "senior",
+    "sr",
+    "staff",
+}
+
+TRAILING_QUALIFIERS = {
+    "contract",
+    "contractor",
+    "ft",
+    "hybrid",
+    "onsite",
+    "part",
+    "pt",
+    "remote",
+    "temp",
+    "temporary",
+    "time",
+}
+
+
+def extract_job_title_from_link(link: str) -> str:
+    parsed = urlparse(str(link))
+    path = unquote(parsed.path)
+    marker = "/jobs/view/"
+
+    if marker in path:
+        slug = path.split(marker, 1)[1].strip("/")
+    else:
+        parts = [part for part in path.split("/") if part]
+        slug = parts[-1] if parts else ""
+
+    slug = slug.split("?", 1)[0].split("#", 1)[0]
+    slug = re.sub(r"-\d+$", "", slug)
+    slug = re.split(r"-at-", slug, maxsplit=1)[0]
+    slug = re.sub(r"-[a-z]+-\d+$", "", slug)
+
+    words = [word for word in re.split(r"[-_\s]+", slug.lower()) if word and not word.isdigit()]
+    while words and words[0] in SENIORITY_WORDS:
+        words.pop(0)
+    while words and words[-1] in TRAILING_QUALIFIERS | SENIORITY_WORDS:
+        words.pop()
+
+    return " ".join(words).strip()
 
 def main():
     dataset_name = "asaniczka/1-3m-linkedin-jobs-and-skills-2024"
@@ -41,68 +97,33 @@ def main():
     df = df[[link_col, skills_col]].rename(columns={link_col: "job_link", skills_col: "skills"})
     df = df.dropna(subset=["job_link"]).drop_duplicates(subset=["job_link"]).reset_index(drop=True)
 
-    # 3. Extract Job Titles using LLM
-    import os
-    OLLAMA_GENERATE_URL = os.environ.get("OLLAMA_GENERATE_URL", "http://localhost:16434/api/generate")
-    DEFAULT_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3.5:9b")
-    DEFAULT_TIMEOUT_SECONDS = int(os.environ.get("OLLAMA_TIMEOUT_SECONDS", "120"))
-
-    print("Extracting job titles using local LLM...")
-    job_titles = []
-    
-    prompt_template = """Analyze this LinkedIn job URL and return only the extracted job title.
-Do not include any other text or explanation.
-
-Examples:
-URL: https://www.linkedin.com/jobs/view/housekeeper-1-pt-at-jacksonville-state-university-3802280436
-Title: housekeeper
-
-URL: https://www.linkedin.com/jobs/view/assistant-general-manager-huntington-4131-at-ruby-tuesday-3575032
-Title: assistant general manager
-
-URL: https://www.linkedin.com/jobs/view/school-based-behavior-analyst-at-ccres-educational-and-behavioral
-Title: school based behavior analyst
-
-URL: https://www.linkedin.com/jobs/view/electrical-assembly-lead-at-sanmina-3704300377
-Title: electrical assembly
-
-URL: https://www.linkedin.com/jobs/view/senior-lead-technician-programmer-at-security-101-3785441848
-Title: technician programmer
-
-note: in this part we only need job title, for instance with 
-URL: https://www.linkedin.com/jobs/view/senior-lead-technician-programmer-at-security-101-3785441848
-Title: technician programmer, we have the job title is technician programmer, we don't need senir lead as this is just level of employees.
-
-URL: {link}
-Title: """
+    print("Extracting job titles from LinkedIn URLs...")
 
     # 4. Format and export continuously
     output_csv.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(columns=["id", "job_title", "skills"]).to_csv(output_csv, index=False)
     
     current_id = 1
+    skipped_rows = 0
     for index, row in tqdm(df.iterrows(), total=len(df)):
         link = row["job_link"]
         skills = row["skills"]
-        prompt = prompt_template.format(link=link)
-        try:
-            title = generate_with_local_llm(
-                prompt,
-                model=DEFAULT_MODEL,
-                url=OLLAMA_GENERATE_URL,
-                timeout=DEFAULT_TIMEOUT_SECONDS
-            )
-            # Simple clean up
-            title = title.replace("```text", "").replace("```", "").strip()
-        except Exception:
-            title = ""
+        title = extract_job_title_from_link(link)
 
-        if title:
-            temp_df = pd.DataFrame([{"id": current_id, "job title": title, "skills": skills}])
-            temp_df.to_csv(output_csv, mode='a', header=False, index=False)
-            current_id += 1
+        if not title:
+            skipped_rows += 1
+            continue
+
+        temp_df = pd.DataFrame([{"id": current_id, "job_title": title, "skills": skills}])
+        temp_df.to_csv(output_csv, mode='a', header=False, index=False)
+        current_id += 1
+
+    if current_id == 1:
+        raise RuntimeError("Exported 0 rows. Could not extract job titles from the job_link column.")
 
     print(f"Exported {current_id - 1} rows to {output_csv}")
+    if skipped_rows:
+        print(f"Skipped {skipped_rows} rows without extractable job titles.")
 
 if __name__ == "__main__":
     main()
