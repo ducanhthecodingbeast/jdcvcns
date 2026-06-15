@@ -19,6 +19,22 @@ elif [[ -f "Dataset/.env.local" ]]; then
     set +a
 fi
 
-# Run the python script directly using system python
-# Assuming user has packages installed globally or is in their own venv.
-python3 -m Dataset.jobskillpair.jobskillpair "$@"
+# Run the python script using venv python if it exists, else system python
+if [[ -f "Dataset/.venv/bin/python3" ]]; then
+    PYTHON_EXEC="Dataset/.venv/bin/python3"
+else
+    PYTHON_EXEC="python3"
+fi
+
+# Check for --background flag
+if [[ "${1:-}" == "--background" ]]; then
+    shift
+    LOG_FILE="Dataset/Data/jobskillpair.log"
+    echo "Starting jobskillpair in background using ${PYTHON_EXEC}..."
+    nohup "${PYTHON_EXEC}" -m Dataset.jobskillpair.jobskillpair "$@" > "$LOG_FILE" 2>&1 &
+    echo "Background process started! PID: $!"
+    echo "You can monitor the progress by running: tail -f $LOG_FILE"
+    exit 0
+fi
+
+"${PYTHON_EXEC}" -m Dataset.jobskillpair.jobskillpair "$@"
