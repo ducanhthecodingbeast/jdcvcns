@@ -5,6 +5,4 @@
 __pycache__/
 *.pyc
 tbfsv/
-
-# Ignore all CSV files
 *.csv

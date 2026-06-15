@@ -76,7 +76,14 @@ Title: technician programmer, we have the job title is technician programmer, we
 URL: {link}
 Title: """
 
-    for link in tqdm(df["job_link"]):
+    # 4. Format and export continuously
+    output_csv.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(columns=["id", "job_title", "skills"]).to_csv(output_csv, index=False)
+    
+    current_id = 1
+    for index, row in tqdm(df.iterrows(), total=len(df)):
+        link = row["job_link"]
+        skills = row["skills"]
         prompt = prompt_template.format(link=link)
         try:
             title = generate_with_local_llm(
@@ -87,20 +94,15 @@ Title: """
             )
             # Simple clean up
             title = title.replace("```text", "").replace("```", "").strip()
-            job_titles.append(title)
         except Exception:
-            job_titles.append("")
+            title = ""
 
-    df["job_title"] = job_titles
-    df = df[df["job_title"] != ""].reset_index(drop=True)
+        if title:
+            temp_df = pd.DataFrame([{"id": current_id, "job title": title, "skills": skills}])
+            temp_df.to_csv(output_csv, mode='a', header=False, index=False)
+            current_id += 1
 
-    # 4. Format and export
-    df.insert(0, "id", range(1, len(df) + 1))
-    final_df = df[["id", "job_title", "skills"]]
-    
-    output_csv.parent.mkdir(parents=True, exist_ok=True)
-    final_df.to_csv(output_csv, index=False)
-    print(f"Exported {len(final_df)} rows to {output_csv}")
+    print(f"Exported {current_id - 1} rows to {output_csv}")
 
 if __name__ == "__main__":
     main()
