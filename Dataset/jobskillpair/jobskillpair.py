@@ -7,7 +7,14 @@ from urllib.parse import unquote, urlparse
 
 import pandas as pd
 from tqdm import tqdm
-from Dataset.localllm import generate_with_local_llm
+
+try:
+    from Dataset.localllm import generate_with_local_llm
+except ModuleNotFoundError:
+    import sys
+
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
+    from localllm import generate_with_local_llm
 
 
 SENIORITY_WORDS = {
