@@ -6,7 +6,9 @@ Goal: compare three CV/JD matching baselines on the same dataset snapshots:
 - `jobberttesting6.1.py`: `TechWolf/JobBERT-v2` embeddings with dot product.
 - `bm25testing6.2.py`: BM25 lexical ranking, using the JobBERT tokenizer by default.
 
-Shared data is read from `../Data`. This project expects `jd.csv` or `JOB_DATA_FINAL.csv`, plus one CV source such as `mockcv.csv`, `cv.csv`, or `USER_DATA_FINAL.csv`.
+Shared data is read from `../Data`. This project expects `jd.csv` or `JOB_DATA_FINAL.csv`, plus `cv.csv` or `USER_DATA_FINAL.csv`.
+
+Tests select the top 30 job titles, then choose the top 10 real CVs per title by dot product between job title and desired job embeddings.
 
 Run the safest default variant first:
 

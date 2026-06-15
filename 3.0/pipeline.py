@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from typing import Iterable
 
+import numpy as np
 import pandas as pd
 
 try:
@@ -76,6 +77,10 @@ REPO_ROOT = PROJECT_ROOT.parent
 DATASET_DIR = REPO_ROOT / "Data"
 RESULTS_DIR = PROJECT_ROOT / "TestingResults"
 DEFAULT_RANDOM_STATE = 42
+TITLE_COLUMN = "Vị trí cần tuyển"
+DESIRED_JOB_COLUMN = "Vị trí ứng tuyển"
+TOP_TITLE_COUNT = 30
+CVS_PER_TITLE = 10
 
 
 CV_RENAME_MAP = {
@@ -206,19 +211,56 @@ def load_datasets(dataset_dir: str | Path = DATASET_DIR) -> tuple[pd.DataFrame, 
     else:
         raise FileNotFoundError(f"Missing {jd_path} or {raw_jd_path}")
 
-    cv_candidates = [
-        dataset_dir / "mockcv.csv",
-        RESULTS_DIR / "mockcv.csv",
-        dataset_dir / "cv.csv",
-        dataset_dir / "USER_DATA_FINAL.csv",
-    ]
+    cv_candidates = [dataset_dir / "cv.csv", dataset_dir / "USER_DATA_FINAL.csv"]
     cv_path = first_non_empty_csv(cv_candidates)
     if cv_path is None:
         expected = ", ".join(str(path) for path in cv_candidates)
         raise FileNotFoundError(f"Missing CV dataset. Expected one of: {expected}")
 
     df_cv = _load_csv(cv_path, normalize_cv)
-    return df_cv, df_jd
+    return select_cvs_by_title_similarity(df_cv, df_jd)
+
+
+def _plain_text(value: object) -> str:
+    return "" if pd.isna(value) else str(value).strip()
+
+
+def select_cvs_by_title_similarity(
+    df_cv: pd.DataFrame,
+    df_jd: pd.DataFrame,
+    *,
+    title_count: int = TOP_TITLE_COUNT,
+    cvs_per_title: int = CVS_PER_TITLE,
+    model_name: str = "AITeamVN/Vietnamese_Embedding_v2",
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    sample_jds = (
+        df_jd.dropna(subset=[TITLE_COLUMN])
+        .drop_duplicates(TITLE_COLUMN)
+        .set_index(TITLE_COLUMN)
+        .loc[df_jd[TITLE_COLUMN].value_counts().head(title_count).index]
+        .reset_index()
+    )
+    title_texts = [_plain_text(row[TITLE_COLUMN]) for _, row in sample_jds.iterrows()]
+    desired_job_texts = [_plain_text(row.get(DESIRED_JOB_COLUMN)) for _, row in df_cv.iterrows()]
+
+    model = load_sentence_transformer(model_name)
+    title_embeddings = model.encode(title_texts, show_progress_bar=True)
+    desired_job_embeddings = model.encode(desired_job_texts, show_progress_bar=True)
+    title_cv_scores = title_embeddings @ desired_job_embeddings.T
+
+    selected_rows = []
+    for title_idx, scores in enumerate(title_cv_scores):
+        jd_row = sample_jds.iloc[title_idx]
+        for rank, cv_idx in enumerate(np.argsort(scores)[::-1][:cvs_per_title], start=1):
+            cv_row = df_cv.iloc[int(cv_idx)].copy()
+            cv_row["source_jd_idx"] = int(title_idx)
+            cv_row["source_jd_title"] = _plain_text(jd_row[TITLE_COLUMN])
+            cv_row["selection_rank"] = int(rank)
+            cv_row["selection_score"] = float(scores[int(cv_idx)])
+            cv_row["source_cv_idx"] = int(cv_idx)
+            selected_rows.append(cv_row)
+
+    return pd.DataFrame(selected_rows).reset_index(drop=True), sample_jds.reset_index(drop=True)
 
 
 def _row_text(row: pd.Series, fields: Iterable[tuple[str, str]]) -> str:

@@ -177,7 +177,7 @@ def load_experiment_datasets(config: Config) -> tuple[pd.DataFrame, pd.DataFrame
         raise FileNotFoundError(
             f"{exc}\n"
             "6.x expects the shared matching datasets under Data/: jd.csv or JOB_DATA_FINAL.csv, "
-            "plus mockcv.csv, cv.csv, or USER_DATA_FINAL.csv. The current ONS skills workbook is "
+            "plus cv.csv or USER_DATA_FINAL.csv. The current ONS skills workbook is "
             "not a CV/JD matching dataset by itself."
         ) from exc
 
@@ -489,6 +489,7 @@ def run_info(config: Config, df_cv: pd.DataFrame, df_jd: pd.DataFrame) -> RunInf
         "top_k": config.top_k,
         "cv_count": int(len(df_cv)),
         "jd_count": int(len(df_jd)),
+        "selection": "top_30_job_titles_top_10_real_cvs_by_desired_job_dot_product",
         "cv_limit": config.cv_limit,
         "jd_limit": config.jd_limit,
         "random_state": config.random_state,

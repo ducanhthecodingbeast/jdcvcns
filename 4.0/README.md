@@ -14,8 +14,9 @@ References:
 - Model: https://huggingface.co/namdp-ptit/ViRanker
 
 Shared exceptions:
-- Data files are read from `../Data`: `jd.csv`, `cv.csv`, `mockcv.csv`.
-- Mock CV generation and data preprocessing live in `../Dataset`.
+- Data files are read from `../Data`: `jd.csv`, `cv.csv`.
+- Tests select the top 30 job titles, then choose the top 10 real CVs per title by dot product between job title and desired job embeddings.
+- Data preprocessing lives in `../Dataset`.
 
 Prepare shared data from the repo root first:
 

@@ -3,8 +3,9 @@
 Goal: run every `dotpdtesting2.x.py` file as part of a complete version-2 test project without importing code from `JobCV-matching_CNS` or from `1.0`/`3.0`.
 
 Shared exceptions:
-- Data files are read from `../Data`: `jd.csv`, `cv.csv`, `mockcv.csv`.
-- Mock CV generation and data preprocessing live in `../Dataset`.
+- Data files are read from `../Data`: `jd.csv`, `cv.csv`.
+- Matching tests select the top 30 job titles, then choose the top 10 real CVs per title by dot product between job title and desired job embeddings.
+- Data preprocessing lives in `../Dataset`.
 
 Prepare shared data from the repo root first:
 
@@ -17,7 +18,6 @@ python -m pip install -r requirements.txt
 export KAGGLE_USERNAME=your_username
 export KAGGLE_KEY=your_api_key
 python data_preprocessing.py
-python -m mockcv --force
 cd ..
 ```
 

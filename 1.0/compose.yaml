@@ -1,6 +1,9 @@
 services:
   postgres:
     image: pgvector/pgvector:pg17
+    env_file:
+      - path: .env.local
+        required: false
     ports:
       - "${POSTGRES_HOST_PORT:-15410}:5432"
     environment:
@@ -9,10 +12,22 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-jdcvcns}
     volumes:
       - postgres_data_10:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $${POSTGRES_USER:-jdcvcns} -d $${POSTGRES_DB:-jdcvcns}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   test:
     image: python:3.11-slim
     working_dir: /workspace/1.0
+    env_file:
+      - path: .env.local
+        required: false
     volumes:
       - .:/workspace/1.0
       - ../Data:/workspace/Data
@@ -28,15 +43,36 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-jdcvcns}
       STORE_DB: ${STORE_DB:-1}
       TOP_K: ${TOP_K:-10}
+      HF_HOME: ${HF_HOME:-/workspace/1.0/.cache/huggingface}
+      SENTENCE_TRANSFORMERS_HOME: ${SENTENCE_TRANSFORMERS_HOME:-/workspace/1.0/.cache/sentence-transformers}
       OLLAMA_GENERATE_URL: ${OLLAMA_GENERATE_URL:-http://host.docker.internal:16434/api/generate}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3.5:9b}
       OLLAMA_TIMEOUT_SECONDS: ${OLLAMA_TIMEOUT_SECONDS:-120}
     depends_on:
-      - postgres
-    command: >
-      sh -lc "apt-get update && apt-get install -y build-essential
-      && pip install --no-cache-dir -r requirements.txt
-      && python3 dotpdtesting1.0.py"
+      postgres:
+        condition: service_healthy
+    command:
+      - sh
+      - -euc
+      - |
+        if [ -f .env.local ]; then
+          set -a
+          . ./.env.local
+          set +a
+        fi
+
+        mkdir -p "$${HF_HOME:-/workspace/1.0/.cache/huggingface}" "$${SENTENCE_TRANSFORMERS_HOME:-/workspace/1.0/.cache/sentence-transformers}"
+
+        if [ "$${SKIP_PIP_INSTALL:-0}" = "1" ]; then
+          echo "Skipping pip install because SKIP_PIP_INSTALL=1"
+        else
+          apt-get update
+          apt-get install -y --no-install-recommends build-essential
+          python3 -m pip install --upgrade pip
+          python3 -m pip install --no-cache-dir -r requirements.txt
+        fi
+
+        python3 dotpdtesting1.0.py
 
 volumes:
   postgres_data_10:

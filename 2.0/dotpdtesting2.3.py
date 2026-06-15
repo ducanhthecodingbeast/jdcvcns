@@ -18,7 +18,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 import torch
 import time
 
-from pipeline import DATASET_DIR, RESULTS_DIR, first_non_empty_csv, get_cv_text, get_jd_text
+from pipeline import DATASET_DIR, RESULTS_DIR, get_cv_text, get_jd_text, load_datasets
 from testingresult import (
     RunInfo,
     env_flag,
@@ -38,26 +38,8 @@ def main():
     store_db = env_flag("STORE_DB", True)
     top_k = int(os.environ.get("TOP_K", "10"))
     
-    # 1. Load JDs and CVs
-    jd_path = source_dir / "jd.csv"
-    cv_path = first_non_empty_csv([
-        source_dir / "mockcv.csv",
-        target_dir / "mockcv.csv",
-    ])
-        
-    if not os.path.exists(jd_path) or cv_path is None:
-        raise FileNotFoundError("Missing datasets. Please make sure Data/jd.csv and a non-empty Data/mockcv.csv exist.")
-
     print(f"📖 Loading datasets...")
-    df_jd = pd.read_csv(jd_path)
-    df_cv = pd.read_csv(cv_path)
-    
-    df_jd.columns = df_jd.columns.str.strip()
-    df_cv.columns = df_cv.columns.str.strip()
-    
-    # Consistent sampling
-    df_cv = df_cv.sample(n=min(600, len(df_cv)), random_state=42).reset_index(drop=True)
-    df_jd = df_jd.sample(n=min(100, len(df_jd)), random_state=42).reset_index(drop=True)
+    df_cv, df_jd = load_datasets(source_dir)
     
     print(f"Loaded {len(df_cv)} CVs and {len(df_jd)} JDs.")
     
@@ -69,8 +51,8 @@ def main():
 
     # Load BAAI/bge-m3 Embeddings
     EMBEDDING_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    cv_cache_bge = EMBEDDING_CACHE_DIR / "cv_embeddings_bge.npy"
-    jd_cache_bge = EMBEDDING_CACHE_DIR / "jd_embeddings_bge.npy"
+    cv_cache_bge = EMBEDDING_CACHE_DIR / "selected_cv_embeddings_bge.npy"
+    jd_cache_bge = EMBEDDING_CACHE_DIR / "selected_jd_embeddings_bge.npy"
     cv_emb_bge, jd_emb_bge = None, None
     
     if os.path.exists(cv_cache_bge) and os.path.exists(jd_cache_bge):
@@ -143,8 +125,9 @@ def main():
                         "jd_count": int(len(df_jd)),
                         "cv_count": int(len(df_cv)),
                         "hybrid_weights": [0.5, 0.5],
+                        "selection": "job_title_to_desired_job_dot_product",
                     },
-                    dataset_meta={"source_dir": str(source_dir)},
+                    dataset_meta={"source_dir": str(source_dir), "cv_path": str(source_dir / "cv.csv")},
                 ),
                 df_cv,
                 df_jd,
