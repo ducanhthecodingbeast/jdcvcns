@@ -1,65 +1,9 @@
-import re
+from pathlib import Path
 import subprocess
 import zipfile
-from pathlib import Path
-from urllib.parse import unquote, urlparse
-
 import pandas as pd
 from tqdm import tqdm
-
-
-SENIORITY_WORDS = {
-    "apprentice",
-    "associate",
-    "intern",
-    "internship",
-    "jr",
-    "junior",
-    "lead",
-    "principal",
-    "senior",
-    "sr",
-    "staff",
-}
-
-TRAILING_QUALIFIERS = {
-    "contract",
-    "contractor",
-    "ft",
-    "hybrid",
-    "onsite",
-    "part",
-    "pt",
-    "remote",
-    "temp",
-    "temporary",
-    "time",
-}
-
-
-def extract_job_title_from_link(link: str) -> str:
-    parsed = urlparse(str(link))
-    path = unquote(parsed.path)
-    marker = "/jobs/view/"
-
-    if marker in path:
-        slug = path.split(marker, 1)[1].strip("/")
-    else:
-        parts = [part for part in path.split("/") if part]
-        slug = parts[-1] if parts else ""
-
-    slug = slug.split("?", 1)[0].split("#", 1)[0]
-    slug = re.sub(r"-\d+$", "", slug)
-    slug = re.split(r"-at-", slug, maxsplit=1)[0]
-    slug = re.sub(r"-[a-z]+-\d+$", "", slug)
-
-    words = [word for word in re.split(r"[-_\s]+", slug.lower()) if word and not word.isdigit()]
-    while words and words[0] in SENIORITY_WORDS:
-        words.pop(0)
-    while words and words[-1] in TRAILING_QUALIFIERS | SENIORITY_WORDS:
-        words.pop()
-
-    return " ".join(words).strip()
+from Dataset.localllm import generate_with_local_llm
 
 def main():
     dataset_name = "asaniczka/1-3m-linkedin-jobs-and-skills-2024"
@@ -82,12 +26,12 @@ def main():
         zip_path.unlink()
 
     # 2. Load data with Pandas
-    source_csv = list(raw_dir.glob("*.csv"))[0]
+    source_csv = list(raw_dir.glob(" *.csv"))[0]
     print(f"Loading data from {source_csv}...")
     df = pd.read_csv(source_csv)
 
     # Find URL column by checking for 'https'
-    link_col = next((c for c in df.columns if df[c].astype(str).str.contains("https", na=False).sum() > 1), None)
+    link_col = next((c for c indf.columns if df[c].astype(str).str.contains("https", na=False).sum() > 1), None)
     if not link_col:
         raise ValueError("Could not find a column containing URLs.")
         
@@ -97,33 +41,29 @@ def main():
     df = df[[link_col, skills_col]].rename(columns={link_col: "job_link", skills_col: "skills"})
     df = df.dropna(subset=["job_link"]).drop_duplicates(subset=["job_link"]).reset_index(drop=True)
 
-    print("Extracting job titles from LinkedIn URLs...")
+    # 3. Extract Job Titles using LLM
+    print("Extracting job titles using local LLM...")
+    job_titles = []
+    for link in tqdm(df["job_link"]):
+        prompt = f"Analyze this LinkedIn job URL and return only the job title.\n\nURL:\n{link}"
+        try:
+            title = generate_with_local_llm(prompt)
+            # Simple clean up
+            title = title.replace("```text", "").replace("```", "").strip()
+            job_titles.append(title)
+        except Exception:
+            job_titles.append("")
 
-    # 4. Format and export continuously
-    output_csv.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(columns=["id", "job_title", "skills"]).to_csv(output_csv, index=False)
+    df["job_title"] = job_titles
+    df = df[df["job_title"] != ""].reset_index(drop=True)
+
+    # 4. Format and export
+    df.insert(0, "id", range(1, len(df) + 1))
+    final_df = df[["id", "job_title", "skills"]]
     
-    current_id = 1
-    skipped_rows = 0
-    for index, row in tqdm(df.iterrows(), total=len(df)):
-        link = row["job_link"]
-        skills = row["skills"]
-        title = extract_job_title_from_link(link)
-
-        if not title:
-            skipped_rows += 1
-            continue
-
-        temp_df = pd.DataFrame([{"id": current_id, "job_title": title, "skills": skills}])
-        temp_df.to_csv(output_csv, mode='a', header=False, index=False)
-        current_id += 1
-
-    if current_id == 1:
-        raise RuntimeError("Exported 0 rows. Could not extract job titles from the job_link column.")
-
-    print(f"Exported {current_id - 1} rows to {output_csv}")
-    if skipped_rows:
-        print(f"Skipped {skipped_rows} rows without extractable job titles.")
+    output_csv.parent.mkdir(parents=True, exist_ok=True)
+    final_df.to_csv(output_csv, index=False)
+    print(f"Exported {len(final_df)} rows to {output_csv}")
 
 if __name__ == "__main__":
     main()
