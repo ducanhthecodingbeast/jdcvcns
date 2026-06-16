@@ -1,4 +1,5 @@
-import os
+import argparse
+import ast
 import re
 import subprocess
 import zipfile
@@ -6,15 +7,6 @@ from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 import pandas as pd
-from tqdm import tqdm
-
-try:
-    from Dataset.localllm import generate_with_local_llm
-except ModuleNotFoundError:
-    import sys
-
-    sys.path.append(str(Path(__file__).resolve().parents[1]))
-    from localllm import generate_with_local_llm
 
 
 SENIORITY_WORDS = {
@@ -71,38 +63,74 @@ def extract_job_title_from_link(link: str) -> str:
     return " ".join(words).strip()
 
 
-def clean_llm_title(title: str) -> str:
-    return title.replace("```text", "").replace("```", "").strip()
+def split_skills(value) -> list[str]:
+    if isinstance(value, (list, tuple, set)):
+        return [clean_skill(skill) for skill in value if clean_skill(skill)]
+
+    if pd.isna(value):
+        return []
+
+    text = str(value).strip()
+    if not text:
+        return []
+
+    if text[0] in "[(" and text[-1] in "])":
+        try:
+            parsed = ast.literal_eval(text)
+            if isinstance(parsed, (list, tuple, set)):
+                return [clean_skill(skill) for skill in parsed if clean_skill(skill)]
+        except (SyntaxError, ValueError):
+            pass
+
+    return [clean_skill(skill) for skill in re.split(r"[,;|\n]+", text) if clean_skill(skill)]
 
 
-def is_local_llm_available(url: str, model: str, timeout: int) -> bool:
-    try:
-        generate_with_local_llm(
-            "Return only this exact text: ok",
-            model=model,
-            url=url,
-            timeout=min(timeout, 10),
-        )
-        return True
-    except Exception as exc:
-        print(f"Local LLM unavailable at {url} using model {model}: {exc}")
-        print("Falling back to deterministic LinkedIn URL title extraction.")
-        return False
+def clean_skill(value) -> str:
+    return re.sub(r"\s+", " ", str(value)).strip(" '\"\t\r\n")
 
 
-def main():
+def find_url_column(df: pd.DataFrame) -> str:
+    for column in df.columns:
+        if df[column].astype(str).str.contains("https", na=False).any():
+            return column
+    raise ValueError("Could not find a column containing https URLs.")
+
+
+def find_skills_column(df: pd.DataFrame, url_column: str) -> str:
+    candidates = [column for column in df.columns if "skill" in column.lower() and column != url_column]
+    if not candidates:
+        raise ValueError("Could not find a skill column.")
+    return candidates[0]
+
+
+def prepare_jobskill_pairs(df: pd.DataFrame) -> pd.DataFrame:
+    url_column = find_url_column(df)
+    skills_column = find_skills_column(df, url_column)
+
+    result = df[[url_column, skills_column]].rename(
+        columns={url_column: "job_link", skills_column: "skill"}
+    )
+    result = result.dropna(subset=["job_link"])
+    result["job title"] = result["job_link"].map(extract_job_title_from_link)
+    result["skill"] = result["skill"].map(split_skills)
+    result = result.explode("skill")
+    result["skill"] = result["skill"].map(clean_skill)
+    result = result[(result["job title"] != "") & (result["skill"] != "")]
+    result = result.drop_duplicates(subset=["job title", "skill"]).reset_index(drop=True)
+    result.insert(0, "id", range(1, len(result) + 1))
+    return result[["id", "job title", "skill"]]
+
+
+def download_dataset(raw_dir: Path) -> None:
     dataset_name = "asaniczka/1-3m-linkedin-jobs-and-skills-2024"
-    
-    # Set paths
-    base_dir = Path(__file__).resolve().parents[2] / "Dataset" / "Data"
-    raw_dir = base_dir / "jobskillpair_raw"
-    output_csv = base_dir / "jobskillpair.csv"
-
     raw_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. Download and extract
-    print("Downloading dataset...")
-    subprocess.run(["kaggle", "datasets", "download", "-d", dataset_name, "-p", str(raw_dir)], check=True)
+    if not list(raw_dir.glob("*.csv")):
+        print("Downloading dataset...")
+        subprocess.run(
+            ["kaggle", "datasets", "download", "-d", dataset_name, "-p", str(raw_dir)],
+            check=True,
+        )
 
     print("Extracting dataset...")
     for zip_path in raw_dir.glob("*.zip"):
@@ -110,100 +138,43 @@ def main():
             zip_ref.extractall(raw_dir)
         zip_path.unlink()
 
-    # 2. Load data with Pandas
-    source_csv = list(raw_dir.glob("*.csv"))[0]
+
+def source_csv_from(raw_dir: Path) -> Path:
+    csv_files = sorted(raw_dir.glob("*.csv"))
+    if not csv_files:
+        raise FileNotFoundError(f"No CSV files found in {raw_dir}")
+    return csv_files[0]
+
+
+def parse_args() -> argparse.Namespace:
+    base_dir = Path(__file__).resolve().parents[2] / "Dataset" / "Data"
+    parser = argparse.ArgumentParser(description="Create id/job title/skill CSV from LinkedIn jobs data.")
+    parser.add_argument("--input", type=Path, help="Optional local source CSV.")
+    parser.add_argument("--output", type=Path, default=base_dir / "jobskillpair.csv")
+    parser.add_argument("--raw-dir", type=Path, default=base_dir / "jobskillpair_raw")
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
+
+    if args.input:
+        source_csv = args.input
+    else:
+        download_dataset(args.raw_dir)
+        source_csv = source_csv_from(args.raw_dir)
+
     print(f"Loading data from {source_csv}...")
     df = pd.read_csv(source_csv)
 
-    # Find URL column by checking for 'https'
-    link_col = next((c for c in df.columns if df[c].astype(str).str.contains("https", na=False).sum() > 1), None)
-    if not link_col:
-        raise ValueError("Could not find a column containing URLs.")
-        
-    # Find Skills column (keep it simple)
-    skills_col = [c for c in df.columns if "skill" in c.lower() and c != link_col][0]
+    output_df = prepare_jobskill_pairs(df)
+    if output_df.empty:
+        raise RuntimeError("Exported 0 rows. Could not extract any job title and skill pairs.")
 
-    df = df[[link_col, skills_col]].rename(columns={link_col: "job_link", skills_col: "skills"})
-    df = df.dropna(subset=["job_link"]).drop_duplicates(subset=["job_link"]).reset_index(drop=True)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    output_df.to_csv(args.output, index=False)
+    print(f"Exported {len(output_df)} rows to {args.output}")
 
-    # 3. Extract Job Titles using LLM
-    OLLAMA_GENERATE_URL = os.environ.get("OLLAMA_GENERATE_URL", "http://localhost:16434/api/generate")
-    DEFAULT_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3.5:9b")
-    DEFAULT_TIMEOUT_SECONDS = int(os.environ.get("OLLAMA_TIMEOUT_SECONDS", "120"))
-
-    print("Extracting job titles using local LLM...")
-    use_local_llm = is_local_llm_available(
-        OLLAMA_GENERATE_URL,
-        DEFAULT_MODEL,
-        DEFAULT_TIMEOUT_SECONDS,
-    )
-
-    prompt_template = """Analyze this LinkedIn job URL and return only the extracted job title.
-Do not include any other text or explanation.
-
-Examples:
-URL: https://www.linkedin.com/jobs/view/housekeeper-1-pt-at-jacksonville-state-university-3802280436
-Title: housekeeper
-
-URL: https://www.linkedin.com/jobs/view/assistant-general-manager-huntington-4131-at-ruby-tuesday-3575032
-Title: assistant general manager
-
-URL: https://www.linkedin.com/jobs/view/school-based-behavior-analyst-at-ccres-educational-and-behavioral
-Title: school based behavior analyst
-
-URL: https://www.linkedin.com/jobs/view/electrical-assembly-lead-at-sanmina-3704300377
-Title: electrical assembly
-
-URL: https://www.linkedin.com/jobs/view/senior-lead-technician-programmer-at-security-101-3785441848
-Title: technician programmer
-
-note: in this part we only need job title, for instance with 
-URL: https://www.linkedin.com/jobs/view/senior-lead-technician-programmer-at-security-101-3785441848
-Title: technician programmer, we have the job title is technician programmer, we don't need senior lead as this is just level of employees.
-
-URL: {link}
-Title: """
-
-    # 4. Format and export continuously
-    output_csv.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(columns=["id", "job_title", "skills"]).to_csv(output_csv, index=False)
-    
-    current_id = 1
-    skipped_rows = 0
-    for index, row in tqdm(df.iterrows(), total=len(df)):
-        link = row["job_link"]
-        skills = row["skills"]
-        prompt = prompt_template.format(link=link)
-        title = ""
-        if use_local_llm:
-            try:
-                title = generate_with_local_llm(
-                    prompt,
-                    model=DEFAULT_MODEL,
-                    url=OLLAMA_GENERATE_URL,
-                    timeout=DEFAULT_TIMEOUT_SECONDS,
-                )
-                title = clean_llm_title(title)
-            except Exception as exc:
-                tqdm.write(f"[LLM Error] Failed for '{link}': {exc}")
-
-        if not title:
-            title = extract_job_title_from_link(link)
-
-        if not title:
-            skipped_rows += 1
-            continue
-
-        temp_df = pd.DataFrame([{"id": current_id, "job_title": title, "skills": skills}])
-        temp_df.to_csv(output_csv, mode='a', header=False, index=False)
-        current_id += 1
-
-    if current_id == 1:
-        raise RuntimeError("Exported 0 rows. Could not extract job titles from the job_link column.")
-
-    print(f"Exported {current_id - 1} rows to {output_csv}")
-    if skipped_rows:
-        print(f"Skipped {skipped_rows} rows without extractable job titles.")
 
 if __name__ == "__main__":
     main()
