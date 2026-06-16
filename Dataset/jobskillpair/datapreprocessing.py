@@ -2,7 +2,7 @@ import argparse
 import ast
 import json
 import re
-import zipfile
+import sys
 from collections import defaultdict
 from pathlib import Path
 from urllib.parse import unquote, urlparse
@@ -25,8 +25,17 @@ except Exception:
     def tqdm(iterable=None, **kwargs):
         return iterable
 
-MAX_LOCAL_DOWNLOAD_BYTES = 100 * 1024 * 1024
-DATASET_NAME = "asaniczka/1-3m-linkedin-jobs-and-skills-2024"
+
+def progress(iterable, **kwargs):
+    return tqdm(
+        iterable,
+        dynamic_ncols=True,
+        leave=False,
+        disable=not sys.stderr.isatty(),
+        **kwargs,
+    )
+
+
 DONE_VERSION = "jobskillpair-preprocess-v4"
 DEFAULT_CHUNK_SIZE = 100_000
 NLP = None
@@ -390,8 +399,9 @@ def combine_existing_output(output_csv: Path) -> None:
     aggregated: dict[str, list[str]] = defaultdict(list)
     seen: set[tuple[str, str]] = set()
 
-    for chunk in tqdm(iter_csv_chunks(output_csv, DEFAULT_CHUNK_SIZE), desc="chunks", unit="chunk"):
-        for row in tqdm(chunk[["job title", "skill"]].itertuples(index=False), total=len(chunk), desc="rows", unit="row"):
+    chunks = iter_csv_chunks(output_csv, DEFAULT_CHUNK_SIZE)
+    for chunk in progress(chunks, desc="Combining chunks", unit="chunk"):
+        for row in chunk[["job title", "skill"]].itertuples(index=False):
             title = clean_job_title(row[0])
             for skill in split_skills(row[1]):
                 add_pair(aggregated, seen, title, skill)
@@ -425,11 +435,12 @@ def build_combined_jobskill_csv(
     aggregated: dict[str, list[str]] = defaultdict(list)
     seen: set[tuple[str, str]] = set()
 
-    for chunk in tqdm(iter_csv_chunks(source_csv, chunksize), desc="chunks", unit="chunk"):
+    chunks = iter_csv_chunks(source_csv, chunksize)
+    for chunk in progress(chunks, desc="Preprocessing chunks", unit="chunk"):
         url_column = find_url_column(chunk, url_col)
         skills_column = find_skills_column(chunk, url_column, skill_col)
 
-        for row in tqdm(chunk[[url_column, skills_column]].itertuples(index=False), total=len(chunk), desc="rows", unit="row"):
+        for row in chunk[[url_column, skills_column]].itertuples(index=False):
             title = clean_job_title(extract_job_title_from_link(row[0]))
             for skill in split_skills(row[1]):
                 add_pair(aggregated, seen, title, skill)
@@ -444,33 +455,6 @@ def find_existing_source_csv(raw_dir: Path, url_col: str | None = None, skill_co
     return None
 
 
-def extract_zip_if_needed(raw_dir: Path, url_col: str | None = None, skill_col: str | None = None) -> Path | None:
-    source_csv = find_existing_source_csv(raw_dir, url_col, skill_col)
-    if source_csv:
-        print(f"PASS extract: found source CSV {source_csv}")
-        return source_csv
-
-    zip_files = sorted(raw_dir.glob("*.zip"))
-    if not zip_files:
-        print("SKIP extract: no zip file found")
-        return None
-
-    for zip_path in zip_files:
-        if zip_path.stat().st_size > MAX_LOCAL_DOWNLOAD_BYTES:
-            raise RuntimeError(
-                f"{zip_path} is larger than 100MB. Move preprocessing to the server or ask permission first."
-            )
-
-        print(f"RUN extract: {zip_path}")
-        with zipfile.ZipFile(zip_path, "r") as zip_ref:
-            zip_ref.extractall(raw_dir)
-
-    source_csv = find_existing_source_csv(raw_dir, url_col, skill_col)
-    if not source_csv:
-        files = sorted(path.name for path in raw_dir.iterdir())
-        raise FileNotFoundError(f"Extracted files did not include a usable source CSV in {raw_dir}. Files: {files}")
-    return source_csv
-
 
 def parse_args() -> argparse.Namespace:
     base_dir = Path(__file__).resolve().parents[2] / "Dataset" / "Data"
@@ -482,12 +466,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", type=Path, default=base_dir / "jobskillpair.csv")
     parser.add_argument("--chunksize", type=int, default=DEFAULT_CHUNK_SIZE)
     parser.add_argument("--force", action="store_true", help="Rebuild output even if it already looks valid.")
-    return parser.parse_args()
+    args, _ = parser.parse_known_args()
+    return args
 
 
 def main() -> None:
     args = parse_args()
-    args.raw_dir.mkdir(parents=True, exist_ok=True)
 
     if not args.force and output_is_combined(args.output):
         print(f"PASS preprocess: output already exists at {args.output}")
@@ -503,12 +487,14 @@ def main() -> None:
         source_csv = args.input
         print(f"PASS source: using input {source_csv}")
     else:
-        source_csv = extract_zip_if_needed(args.raw_dir, args.url_col, args.skill_col)
+        source_csv = find_existing_source_csv(args.raw_dir, args.url_col, args.skill_col)
+        if source_csv:
+            print(f"PASS source: found extracted CSV {source_csv}")
 
     if not source_csv:
         raise FileNotFoundError(
-            "No usable source CSV found. Provide --input or place an extracted CSV in the raw directory. "
-            f"This script will not download {DATASET_NAME} locally."
+            "No usable source CSV found. Run jobskillpair.py first to download/unzip, "
+            "or provide --input with an extracted source CSV."
         )
 
     print(f"RUN preprocess: {source_csv} -> {args.output}")
