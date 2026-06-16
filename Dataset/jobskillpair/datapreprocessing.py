@@ -102,6 +102,20 @@ def csv_has_columns(path: Path, columns: set[str]) -> bool:
     return columns <= header
 
 
+def output_is_combined(path: Path) -> bool:
+    if not csv_has_columns(path, {"id", "job title", "skill"}):
+        return False
+
+    df = pd.read_csv(path, usecols=["job title", "skill"])
+    if df.empty:
+        return False
+
+    df["job title"] = df["job title"].astype(str).str.strip()
+    df["skill"] = df["skill"].astype(str).str.strip()
+    df = df[(df["job title"] != "") & (df["skill"] != "")]
+    return not df.empty and not df["job title"].duplicated().any()
+
+
 def source_csv_is_usable(path: Path) -> bool:
     if not path.exists() or path.stat().st_size == 0:
         return False
@@ -128,6 +142,23 @@ def find_skills_column(df: pd.DataFrame, url_column: str) -> str:
     if not candidates:
         raise ValueError("Could not find a skill column.")
     return candidates[0]
+
+
+def combine_existing_output(output_csv: Path) -> None:
+    df = pd.read_csv(output_csv)
+    df["job title"] = df["job title"].astype(str).str.strip()
+    df["skill"] = df["skill"].map(split_skills)
+    df = df.explode("skill")
+    df["skill"] = df["skill"].map(clean_skill)
+    df = df[(df["job title"] != "") & (df["skill"] != "")]
+    df = df.drop_duplicates(subset=["job title", "skill"])
+    df = (
+        df.groupby("job title", as_index=False, sort=False)["skill"]
+        .agg(lambda skills: ", ".join(skills))
+        .reset_index(drop=True)
+    )
+    df.insert(0, "id", range(1, len(df) + 1))
+    df[["id", "job title", "skill"]].to_csv(output_csv, index=False)
 
 
 def build_combined_jobskill_csv(source_csv: Path, output_csv: Path) -> None:
@@ -207,8 +238,14 @@ def main() -> None:
     args = parse_args()
     args.raw_dir.mkdir(parents=True, exist_ok=True)
 
-    if not args.force and csv_has_columns(args.output, {"id", "job title", "skill"}):
+    if not args.force and output_is_combined(args.output):
         print(f"PASS preprocess: output already exists at {args.output}")
+        return
+
+    if not args.force and csv_has_columns(args.output, {"id", "job title", "skill"}):
+        print(f"RUN combine: grouping duplicate job titles in {args.output}")
+        combine_existing_output(args.output)
+        print(f"DONE combine: wrote {args.output}")
         return
 
     if args.input:
