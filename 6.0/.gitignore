@@ -7,3 +7,5 @@ TestingResults/
 *.pid
 __pycache__/
 *.pyc
+file.json
+TestingResults/file.json

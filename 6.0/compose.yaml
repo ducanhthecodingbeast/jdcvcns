@@ -25,6 +25,9 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-jdcvcns}
       STORE_DB: ${STORE_DB:-1}
       TOP_K: ${TOP_K:-10}
+      CV_FILE: ${CV_FILE:-mockcv.small.csv}
+      JD_FILE: ${JD_FILE:-jd.csv}
+      RESULTS_JSON: ${RESULTS_JSON:-file.json}
       JOBBERT_MODEL: ${JOBBERT_MODEL:-TechWolf/JobBERT-v2}
       JOBBERT_BATCH_SIZE: ${JOBBERT_BATCH_SIZE:-64}
       JOBBERT_MAX_LENGTH: ${JOBBERT_MAX_LENGTH:-512}
@@ -43,7 +46,7 @@ services:
       BM25_K1: ${BM25_K1:-1.5}
       BM25_B: ${BM25_B:-0.75}
       BM25_REGEX_TOKENIZER: ${BM25_REGEX_TOKENIZER:-1}
-      WRITE_RESULTS: ${WRITE_RESULTS:-0}
+      WRITE_RESULTS: ${WRITE_RESULTS:-1}
     depends_on:
       postgres:
         condition: service_started

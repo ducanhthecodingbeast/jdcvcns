@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TalentCLEF CV/JD Matching</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --blue: #0f62fe;
+      --blue-dark: #002d9c;
+      --ink: #161616;
+      --muted: #525252;
+      --subtle: #8c8c8c;
+      --canvas: #ffffff;
+      --surface: #f4f4f4;
+      --line: #e0e0e0;
+      --success: #24a148;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--canvas);
+      color: var(--ink);
+      font-family: "IBM Plex Sans", sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+      letter-spacing: 0.16px;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 24px;
+      padding: 48px;
+      border-bottom: 1px solid var(--line);
+      background: var(--canvas);
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 900px;
+      font-size: clamp(38px, 6vw, 76px);
+      font-weight: 300;
+      line-height: 1.17;
+      letter-spacing: 0;
+    }
+
+    h2,
+    h3,
+    p {
+      margin: 0;
+    }
+
+    .meta {
+      align-self: end;
+      display: grid;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .status {
+      color: var(--blue);
+      font-weight: 600;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      min-height: calc(100vh - 220px);
+    }
+
+    nav {
+      border-right: 1px solid var(--line);
+      background: var(--surface);
+      padding: 24px 0;
+    }
+
+    .tab {
+      width: 100%;
+      border: 0;
+      border-top: 1px solid var(--line);
+      background: transparent;
+      color: var(--ink);
+      cursor: pointer;
+      display: block;
+      font: inherit;
+      padding: 16px 24px;
+      text-align: left;
+    }
+
+    .tab:last-child {
+      border-bottom: 1px solid var(--line);
+    }
+
+    .tab[aria-selected="true"] {
+      background: var(--canvas);
+      box-shadow: inset 4px 0 0 var(--blue);
+      color: var(--blue-dark);
+      font-weight: 600;
+    }
+
+    .content {
+      min-width: 0;
+    }
+
+    .run {
+      display: none;
+    }
+
+    .run.active {
+      display: block;
+    }
+
+    .run-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) repeat(3, minmax(120px, 180px));
+      border-bottom: 1px solid var(--line);
+    }
+
+    .run-title,
+    .metric {
+      padding: 24px;
+    }
+
+    .run-title h2 {
+      font-size: 32px;
+      font-weight: 400;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    .run-title p,
+    .metric span,
+    .empty {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .metric {
+      border-left: 1px solid var(--line);
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 24px;
+      font-weight: 400;
+      line-height: 1.33;
+      letter-spacing: 0;
+    }
+
+    .cv {
+      border-bottom: 1px solid var(--line);
+    }
+
+    .cv summary {
+      cursor: pointer;
+      display: grid;
+      grid-template-columns: minmax(240px, 360px) minmax(0, 1fr);
+      gap: 24px;
+      padding: 24px 48px;
+    }
+
+    .cv-title {
+      font-size: 24px;
+      font-weight: 400;
+      line-height: 1.33;
+      letter-spacing: 0;
+    }
+
+    .cv-text {
+      color: var(--muted);
+      font-size: 14px;
+      max-height: 92px;
+      overflow: hidden;
+    }
+
+    .payload {
+      padding: 0 48px 24px;
+    }
+
+    .payload summary {
+      display: block;
+      padding: 12px 0;
+      color: var(--blue);
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    dl {
+      display: grid;
+      grid-template-columns: minmax(160px, 240px) minmax(0, 1fr);
+      margin: 0;
+      border-top: 1px solid var(--line);
+    }
+
+    dt,
+    dd {
+      border-bottom: 1px solid var(--line);
+      margin: 0;
+      padding: 8px 12px;
+      min-width: 0;
+      overflow-wrap: anywhere;
+      font-size: 14px;
+    }
+
+    dt {
+      background: var(--surface);
+      color: var(--muted);
+    }
+
+    .matches {
+      display: grid;
+      gap: 0;
+      padding: 0 48px 32px;
+    }
+
+    .match {
+      display: grid;
+      grid-template-columns: 72px minmax(0, 1fr) minmax(0, 1.2fr);
+      border-top: 1px solid var(--line);
+      background: var(--canvas);
+    }
+
+    .rank,
+    .jd,
+    .score {
+      min-width: 0;
+      padding: 16px;
+    }
+
+    .rank {
+      color: var(--blue);
+      font-size: 20px;
+    }
+
+    .jd h3 {
+      font-size: 20px;
+      font-weight: 400;
+      line-height: 1.4;
+      letter-spacing: 0;
+    }
+
+    .jd p,
+    .score p {
+      color: var(--muted);
+      font-size: 14px;
+      margin-top: 8px;
+    }
+
+    .bar {
+      height: 16px;
+      margin-top: 8px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+    }
+
+    .fill {
+      height: 100%;
+      background: var(--blue);
+      width: 0;
+    }
+
+    .error {
+      padding: 48px;
+      color: #da1e28;
+    }
+
+    @media (max-width: 900px) {
+      header,
+      main,
+      .run-head,
+      .cv summary,
+      .match {
+        grid-template-columns: 1fr;
+      }
+
+      header,
+      .cv summary,
+      .matches {
+        padding-left: 24px;
+        padding-right: 24px;
+      }
+
+      nav {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>TalentCLEF CV/JD matching</h1>
+      <p id="subtitle" class="status">Loading TestingResults/file.json</p>
+    </div>
+    <div class="meta">
+      <span id="dataset">Dataset pending</span>
+      <span id="updated">Updated pending</span>
+    </div>
+  </header>
+  <main>
+    <nav id="tabs" aria-label="Matching runs"></nav>
+    <section id="content" class="content"></section>
+  </main>
+
+  <script>
+    const fields = [
+      "Tên ứng viên",
+      "Vị trí ứng tuyển",
+      "Lĩnh vực",
+      "Kỹ năng",
+      "Kinh nghiệm",
+      "Vị trí cần tuyển",
+      "Tên công ty",
+      "Mô tả công việc",
+      "Yêu cầu công việc",
+      "Quyền lợi"
+    ];
+
+    const text = (value) => String(value ?? "").trim();
+    const html = (value) => text(value).replace(/[&<>"']/g, (ch) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    })[ch]);
+
+    function summary(payload, fallback = "") {
+      const found = fields.map((key) => text(payload?.[key])).filter(Boolean);
+      return found.slice(0, 4).join(" | ") || fallback;
+    }
+
+    function scoreWidth(score, maxScore) {
+      if (!Number.isFinite(score) || maxScore <= 0) return 0;
+      return Math.max(3, Math.round((score / maxScore) * 100));
+    }
+
+    function renderRun(name, run, active) {
+      const byCv = new Map();
+      for (const match of run.matches || []) {
+        if (!byCv.has(match.cv_id)) byCv.set(match.cv_id, []);
+        byCv.get(match.cv_id).push(match);
+      }
+      const maxScore = Math.max(...(run.matches || []).map((m) => Number(m.score) || 0), 0);
+      const cvs = [...byCv.entries()].map(([cvId, matches]) => {
+        matches.sort((a, b) => a.rank - b.rank);
+        const first = matches[0] || {};
+        return `
+          <details class="cv" open>
+            <summary>
+              <div>
+                <p class="cv-title">${html(first.cv_title || `CV ${cvId}`)}</p>
+                <p class="empty">CV ${html(cvId)}</p>
+              </div>
+              <p class="cv-text">${html(summary(first.cv, first.cv_title))}</p>
+            </summary>
+            <div class="matches">
+              ${matches.map((match) => `
+                <article class="match">
+                  <div class="rank">#${html(match.rank)}</div>
+                  <div class="jd">
+                    <h3>${html(match.jd_title || `JD ${match.jd_id}`)}</h3>
+                    <p>${html(summary(match.jd, match.jd_title))}</p>
+                    <details class="payload">
+                      <summary>Full JD</summary>
+                      ${payloadRows(match.jd)}
+                    </details>
+                  </div>
+                  <div class="score">
+                    <strong>${Number(match.score).toFixed(4)}</strong>
+                    <p>${html(match.score_method)} score</p>
+                    <div class="bar" aria-hidden="true">
+                      <div class="fill" style="width: ${scoreWidth(Number(match.score), maxScore)}%"></div>
+                    </div>
+                  </div>
+                </article>
+              `).join("")}
+            </div>
+            <details class="payload">
+              <summary>Full CV</summary>
+              ${payloadRows(first.cv)}
+            </details>
+          </details>
+        `;
+      }).join("");
+
+      return `
+        <section class="run ${active ? "active" : ""}" id="run-${html(name)}">
+          <div class="run-head">
+            <div class="run-title">
+              <h2>${html(name)}</h2>
+              <p>${html(run.algorithm)} / ${html(run.score_method)}</p>
+            </div>
+            <div class="metric"><strong>${html(run.cv_count)}</strong><span>CV rows</span></div>
+            <div class="metric"><strong>${html(run.jd_count)}</strong><span>JD rows</span></div>
+            <div class="metric"><strong>${html(run.match_count)}</strong><span>Matches</span></div>
+          </div>
+          ${cvs || '<p class="error">No display matches found in this run.</p>'}
+        </section>
+      `;
+    }
+
+    function activate(name) {
+      document.querySelectorAll(".tab").forEach((tab) => {
+        tab.setAttribute("aria-selected", String(tab.dataset.run === name));
+      });
+      document.querySelectorAll(".run").forEach((run) => {
+        run.classList.toggle("active", run.id === `run-${name}`);
+      });
+    }
+
+    function payloadRows(payload) {
+      const rows = Object.entries(payload || {}).filter(([, value]) => text(value));
+      return `<dl>${rows.map(([key, value]) => `<dt>${html(key)}</dt><dd>${html(value)}</dd>`).join("")}</dl>`;
+    }
+
+    fetch("TestingResults/file.json", { cache: "no-store" })
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      })
+      .then((data) => {
+        const entries = Object.entries(data.runs || {});
+        document.getElementById("subtitle").textContent = `${data.benchmark || "Benchmark"} top ${data.top_k || 10} matches`;
+        document.getElementById("dataset").textContent = `${data.cv_file || "CV"} -> ${data.jd_file || "JD"}`;
+        document.getElementById("updated").textContent = data.updated_at ? `Updated ${data.updated_at}` : "Updated pending";
+        document.getElementById("tabs").innerHTML = entries.map(([name], index) => `
+          <button class="tab" type="button" data-run="${html(name)}" aria-selected="${index === 0}">${html(name)}</button>
+        `).join("");
+        document.getElementById("content").innerHTML = entries.map(([name, run], index) => renderRun(name, run, index === 0)).join("");
+        document.querySelectorAll(".tab").forEach((tab) => {
+          tab.addEventListener("click", () => activate(tab.dataset.run));
+        });
+      })
+      .catch((error) => {
+        document.getElementById("content").innerHTML = `<p class="error">Could not load TestingResults/file.json: ${html(error.message)}</p>`;
+      });
+  </script>
+</body>
+</html>

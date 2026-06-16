@@ -6,9 +6,9 @@ Goal: compare three CV/JD matching baselines on the same dataset snapshots:
 - `jobberttesting6.1.py`: `TechWolf/JobBERT-v2` embeddings with dot product.
 - `bm25testing6.2.py`: BM25 lexical ranking, using the JobBERT tokenizer by default.
 
-Shared data is read from `../Data`. This project expects `jd.csv` or `JOB_DATA_FINAL.csv`, plus `cv.csv` or `USER_DATA_FINAL.csv`.
+Shared data is read from `../Data`. The TalentCLEF server test expects `mockcv.small.csv` for CVs and `jd.csv` for JDs.
 
-Tests select the top 30 job titles, then choose the top 10 real CVs per title by dot product between job title and desired job embeddings.
+Each test matches every mock CV against all rows in `jd.csv`, stores the top 10 JDs per CV in Postgres, and writes `TestingResults/file.json` for `5matching.html`.
 
 Run the safest default variant first:
 
@@ -30,6 +30,12 @@ Run one variant:
 ./run.sh 6.1 -- --cv-limit 100 --jd-limit 100
 ./run.sh 6.2 -- --regex-tokenizer
 ./run.sh all
+```
+
+Open the static viewer after the server run writes JSON:
+
+```bash
+5matching.html
 ```
 
 Run in Docker Compose:

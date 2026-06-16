@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import math
 import os
 import re
@@ -11,7 +12,7 @@ import sys
 import time
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -25,13 +26,14 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from pipeline import DATASET_DIR, RESULTS_DIR, get_cv_text, get_jd_text, load_datasets, sample_dataframe
-from testingresult import RunInfo, env_flag, open_store, store_match_run
+from pipeline import DATASET_DIR, RESULTS_DIR, get_cv_text, get_jd_text, normalize_cv, normalize_jd, sample_dataframe
+from testingresult import RunInfo, env_flag, open_store, store_match_run, to_jsonable
 
 
 JOBBERT_MODEL = os.environ.get("JOBBERT_MODEL", "TechWolf/JobBERT-v2")
 TOKEN_RE = re.compile(r"(?u)\b\w+\b")
 DENSE_ALGORITHMS = {"cosine", "dot_product"}
+BENCHMARK_NAME = "TalentCLEF"
 
 
 @dataclass(frozen=True)
@@ -40,6 +42,9 @@ class Config:
     algorithm: str
     dataset_dir: Path
     results_dir: Path
+    cv_file: str
+    jd_file: str
+    results_json: Path
     model_name: str
     top_k: int
     batch_size: int
@@ -78,6 +83,11 @@ def env_float(name: str, default: float) -> float:
 def env_optional_int(name: str) -> int | None:
     value = os.environ.get(name, "").strip()
     return None if not value else int(value)
+
+
+def env_str(name: str, default: str) -> str:
+    value = os.environ.get(name, "").strip()
+    return default if not value else value
 
 
 def configure_torch_runtime() -> None:
@@ -121,6 +131,9 @@ def parse_args(run_name: str, algorithm: str) -> Config:
     )
     parser.add_argument("--dataset-dir", default=str(DATASET_DIR))
     parser.add_argument("--results-dir", default=str(RESULTS_DIR))
+    parser.add_argument("--cv-file", default=env_str("CV_FILE", "mockcv.small.csv"))
+    parser.add_argument("--jd-file", default=env_str("JD_FILE", "jd.csv"))
+    parser.add_argument("--results-json", default=env_str("RESULTS_JSON", "file.json"))
     parser.add_argument("--model-name", default=JOBBERT_MODEL)
     parser.add_argument("--top-k", type=int, default=env_int("TOP_K", 10))
     parser.add_argument("--batch-size", type=int, default=env_int("JOBBERT_BATCH_SIZE", 32))
@@ -145,6 +158,9 @@ def parse_args(run_name: str, algorithm: str) -> Config:
         algorithm=algorithm,
         dataset_dir=Path(args.dataset_dir),
         results_dir=Path(args.results_dir),
+        cv_file=args.cv_file,
+        jd_file=args.jd_file,
+        results_json=Path(args.results_json),
         model_name=args.model_name,
         top_k=max(1, args.top_k),
         batch_size=max(1, args.batch_size),
@@ -157,7 +173,7 @@ def parse_args(run_name: str, algorithm: str) -> Config:
         bm25_b=min(1.0, max(0.0, args.bm25_b)),
         regex_tokenizer=args.regex_tokenizer or env_flag("BM25_REGEX_TOKENIZER", False),
         store_db=env_flag("STORE_DB", True) and not args.no_store_db,
-        write_results=env_flag("WRITE_RESULTS", False) and not args.no_write_results,
+        write_results=env_flag("WRITE_RESULTS", True) and not args.no_write_results,
     )
 
 
@@ -170,16 +186,25 @@ def get_jd_match_text(row: pd.Series) -> str:
     return get_jd_text(row, include_company=True)
 
 
+def dataset_path(dataset_dir: Path, file_name: str) -> Path:
+    base = dataset_dir if dataset_dir.is_absolute() else PROJECT_ROOT / dataset_dir
+    path = Path(file_name)
+    return path if path.is_absolute() else base / path
+
+
 def load_experiment_datasets(config: Config) -> tuple[pd.DataFrame, pd.DataFrame]:
-    try:
-        df_cv, df_jd = load_datasets(config.dataset_dir)
-    except FileNotFoundError as exc:
+    cv_path = dataset_path(config.dataset_dir, config.cv_file)
+    jd_path = dataset_path(config.dataset_dir, config.jd_file)
+    missing = [str(path) for path in (cv_path, jd_path) if not path.exists()]
+    if missing:
         raise FileNotFoundError(
-            f"{exc}\n"
-            "6.x expects the shared matching datasets under Data/: jd.csv or JOB_DATA_FINAL.csv, "
-            "plus cv.csv or USER_DATA_FINAL.csv. The current ONS skills workbook is "
-            "not a CV/JD matching dataset by itself."
-        ) from exc
+            "Missing benchmark CSV(s): "
+            + ", ".join(missing)
+            + "\n6.x TalentCLEF expects Data/mockcv.small.csv for CVs and Data/jd.csv for JDs."
+        )
+
+    df_cv = normalize_cv(pd.read_csv(cv_path))
+    df_jd = normalize_jd(pd.read_csv(jd_path))
 
     df_cv = sample_dataframe(df_cv, config.cv_limit, random_state=config.random_state)
     df_jd = sample_dataframe(df_jd, config.jd_limit, random_state=config.random_state)
@@ -489,7 +514,10 @@ def run_info(config: Config, df_cv: pd.DataFrame, df_jd: pd.DataFrame) -> RunInf
         "top_k": config.top_k,
         "cv_count": int(len(df_cv)),
         "jd_count": int(len(df_jd)),
-        "selection": "top_30_job_titles_top_10_real_cvs_by_desired_job_dot_product",
+        "benchmark": BENCHMARK_NAME,
+        "selection": "mock_cv_csv_against_all_jd_csv",
+        "cv_file": config.cv_file,
+        "jd_file": config.jd_file,
         "cv_limit": config.cv_limit,
         "jd_limit": config.jd_limit,
         "random_state": config.random_state,
@@ -521,6 +549,8 @@ def run_info(config: Config, df_cv: pd.DataFrame, df_jd: pd.DataFrame) -> RunInf
         params=params,
         dataset_meta={
             "dataset_dir": str(config.dataset_dir),
+            "cv_file": config.cv_file,
+            "jd_file": config.jd_file,
             "cv_rows": int(len(df_cv)),
             "jd_rows": int(len(df_jd)),
         },
@@ -574,6 +604,82 @@ def store_results(
         conn.close()
 
 
+def results_json_path(config: Config) -> Path:
+    path = config.results_json
+    if path.is_absolute():
+        return path
+    return config.results_dir / path
+
+
+def display_matches(matches: list[dict[str, Any]], df_cv: pd.DataFrame, *, limit: int = 5) -> list[dict[str, Any]]:
+    chosen = set(
+        df_cv.sample(n=min(limit, len(df_cv)), random_state=42).index.astype(int).tolist()
+        if len(df_cv)
+        else []
+    )
+    return [
+        {
+            "cv_id": int(match["cv_id"]),
+            "cv_title": match["cv_title"],
+            "cv": to_jsonable(match["cv_payload"]),
+            "rank": int(match["rank"]),
+            "jd_id": int(match["jd_id"]),
+            "jd_title": match["jd_title"],
+            "jd": to_jsonable(match["jd_payload"]),
+            "score": float(match["score"]),
+            "score_method": match["score_method"],
+        }
+        for match in matches
+        if int(match["cv_id"]) in chosen and int(match["rank"]) <= 10
+    ]
+
+
+def write_match_json(
+    matches: list[dict[str, Any]],
+    df_cv: pd.DataFrame,
+    df_jd: pd.DataFrame,
+    config: Config,
+    run_id: int | None,
+) -> str | None:
+    if not config.write_results:
+        return None
+
+    path = results_json_path(config)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    data: dict[str, Any] = {}
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            data = {}
+
+    data.update(
+        {
+            "benchmark": BENCHMARK_NAME,
+            "dataset_dir": str(config.dataset_dir),
+            "cv_file": config.cv_file,
+            "jd_file": config.jd_file,
+            "top_k": int(config.top_k),
+            "display_cv_count": min(5, len(df_cv)),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+    runs = data.setdefault("runs", {})
+    runs[config.run_name] = {
+        "algorithm": config.algorithm,
+        "score_method": matches[0]["score_method"] if matches else config.algorithm,
+        "model_name": config.model_name if config.algorithm in DENSE_ALGORITHMS else "bm25",
+        "run_id": run_id,
+        "cv_count": int(len(df_cv)),
+        "jd_count": int(len(df_jd)),
+        "match_count": int(len(matches)),
+        "matches": display_matches(matches, df_cv),
+    }
+
+    path.write_text(json.dumps(to_jsonable(data), ensure_ascii=False, indent=2), encoding="utf-8")
+    return str(path)
+
+
 def write_match_summary(matches: list[dict[str, Any]], config: Config, run_id: int | None) -> str | None:
     if not config.write_results:
         return None
@@ -606,12 +712,14 @@ def run_matching(config: Config) -> dict[str, Any]:
 
     run_id = store_results(matches, df_cv, df_jd, config, started_monotonic)
     result_path = write_match_summary(matches, config, run_id)
+    json_path = write_match_json(matches, df_cv, df_jd, config, run_id)
     return {
         "cv_count": len(df_cv),
         "jd_count": len(df_jd),
         "match_count": len(matches),
         "run_id": run_id,
         "result_path": result_path,
+        "json_path": json_path,
         "elapsed_seconds": round(time.time() - started_wall, 3),
     }
 
@@ -626,3 +734,5 @@ def main(run_name: str, algorithm: str) -> None:
     )
     if result["result_path"]:
         print(f"Result CSV: {result['result_path']}")
+    if result["json_path"]:
+        print(f"Result JSON: {result['json_path']}")
