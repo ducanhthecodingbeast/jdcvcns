@@ -10,6 +10,11 @@ from urllib.parse import unquote, urlparse
 import pandas as pd
 
 try:
+    from nltk.corpus import stopwords
+except ImportError:
+    stopwords = None
+
+try:
     import spacy
 except ImportError:
     spacy = None
@@ -22,9 +27,10 @@ except Exception:
 
 MAX_LOCAL_DOWNLOAD_BYTES = 100 * 1024 * 1024
 DATASET_NAME = "asaniczka/1-3m-linkedin-jobs-and-skills-2024"
-DONE_VERSION = "jobskillpair-preprocess-v2"
+DONE_VERSION = "jobskillpair-preprocess-v4"
 DEFAULT_CHUNK_SIZE = 100_000
 NLP = None
+STOP_WORDS = None
 
 SENIORITY_WORDS = {
     "apprentice",
@@ -73,7 +79,19 @@ EXPERIENCE_PREFIXES = [
     "lead",
     "temp",
 ]
-SCHEDULE_WORDS = ["part time", "full time", "part-time", "full-time", "per diem"]
+SCHEDULE_WORDS = [
+    "part time",
+    "full time",
+    "part-time",
+    "full-time",
+    "per diem",
+    "weekend",
+    "weekends",
+    "days",
+    "nights",
+    "day shift",
+    "night shift",
+]
 EXPERIENCE_PREFIX_PATTERNS = [
     re.compile(r"^" + re.escape(prefix) + r"\s+", re.IGNORECASE)
     for prefix in EXPERIENCE_PREFIXES
@@ -82,9 +100,52 @@ SCHEDULE_PATTERNS = [
     re.compile(r"\b" + re.escape(schedule) + r"\b", re.IGNORECASE)
     for schedule in SCHEDULE_WORDS
 ]
-LOCATION_PATTERN = re.compile(r"\b(?:salem va|brea ca|rochester|gta)\b", re.IGNORECASE)
+LOCATION_PATTERN = re.compile(
+    r"\b(?:salem va|brea ca|phoenix az|dallas tx|near nyc|nyc|rochester|gta)\b",
+    re.IGNORECASE,
+)
 BRANDS = ["calvin klein", "apple", "amazon", "google"]
 BRAND_PATTERNS = [re.compile(r"\b" + re.escape(brand) + r"\b", re.IGNORECASE) for brand in BRANDS]
+TIME_PATTERN = re.compile(r"\b\d{1,2}(?::?\d{2})?\s*(?:am|pm)\b", re.IGNORECASE)
+LEADING_NUMBER_PATTERN = re.compile(r"^(?:\+|\$)?\s*\d+(?:\.\d+)?k?\b\s*", re.IGNORECASE)
+LEADING_SYMBOL_PATTERN = re.compile(r"^[+/\\-]+\s*")
+LEADING_NOISE_WORD_PATTERN = re.compile(r"^(?:year)\b\s*", re.IGNORECASE)
+NOISE_PHRASE_PATTERNS = [
+    re.compile(r"\bsign\s+on\s+(?:bonus|incentive)\b", re.IGNORECASE),
+    re.compile(r"\bweekly\s+pay\b", re.IGNORECASE),
+    re.compile(r"\bnew\s+year\s+new\s+challenge\b", re.IGNORECASE),
+    re.compile(r"\burgent\s+fill\b", re.IGNORECASE),
+    re.compile(r"\bjob\s+hiring\b", re.IGNORECASE),
+    re.compile(r"\b(?:opportunity|opportunities|position|positions|hiring|onsite)\b", re.IGNORECASE),
+]
+FALLBACK_STOP_WORDS = {
+    "a",
+    "an",
+    "and",
+    "for",
+    "in",
+    "is",
+    "of",
+    "on",
+    "or",
+    "the",
+    "to",
+}
+
+
+def get_stop_words() -> set[str]:
+    global STOP_WORDS
+    if STOP_WORDS is not None:
+        return STOP_WORDS
+
+    if stopwords:
+        try:
+            STOP_WORDS = set(stopwords.words("english"))
+        except LookupError:
+            STOP_WORDS = FALLBACK_STOP_WORDS
+    else:
+        STOP_WORDS = FALLBACK_STOP_WORDS
+    return STOP_WORDS
 
 
 def get_nlp():
@@ -130,8 +191,10 @@ def clean_skill(value) -> str:
 
 
 def clean_job_title(title: str) -> str:
-    title = str(title).lower().strip()
+    title = remove_location_entities(str(title).strip())
+    title = title.lower().strip()
     title = LEVEL_SUFFIXES.sub("", title).strip()
+    title = strip_leading_noise(title)
 
     for pattern in EXPERIENCE_PREFIX_PATTERNS:
         title = pattern.sub("", title)
@@ -139,16 +202,31 @@ def clean_job_title(title: str) -> str:
     for pattern in SCHEDULE_PATTERNS:
         title = pattern.sub(" ", title)
 
+    title = TIME_PATTERN.sub(" ", title)
     title = LOCATION_PATTERN.sub(" ", title)
 
     for pattern in BRAND_PATTERNS:
         title = pattern.sub(" ", title)
 
+    for pattern in NOISE_PHRASE_PATTERNS:
+        title = pattern.sub(" ", title)
+
     title = re.sub(r"[^a-z0-9\s\-/+#]", " ", title)
     title = re.sub(r"\s+", " ", title).strip()
-    title = remove_location_entities(title)
+    title = strip_leading_noise(title)
+    title = remove_stop_words(title)
 
     return re.sub(r"\s+", " ", title).strip()
+
+
+def strip_leading_noise(title: str) -> str:
+    previous = None
+    while title and title != previous:
+        previous = title
+        title = LEADING_SYMBOL_PATTERN.sub("", title).strip()
+        title = LEADING_NUMBER_PATTERN.sub("", title).strip()
+        title = LEADING_NOISE_WORD_PATTERN.sub("", title).strip()
+    return title
 
 
 def remove_location_entities(title: str) -> str:
@@ -164,11 +242,7 @@ def remove_location_entities(title: str) -> str:
         if entity.label_ not in {"GPE", "LOC", "FAC"}:
             continue
 
-        start = entity.start
-        if start > 0 and doc[start - 1].lower_ in {"in", "at", "near"}:
-            start -= 1
-
-        skip_indexes.update(range(start, entity.end))
+        skip_indexes.update(range(entity.start, entity.end))
 
     for token in doc:
         if token.i in skip_indexes:
@@ -178,6 +252,12 @@ def remove_location_entities(title: str) -> str:
         kept_tokens.append(token.text)
 
     return " ".join(kept_tokens).strip()
+
+
+def remove_stop_words(title: str) -> str:
+    words = title.split()
+    stop_words = get_stop_words()
+    return " ".join(word for word in words if word not in stop_words)
 
 
 def split_skills(value) -> list[str]:
@@ -238,6 +318,8 @@ def output_is_combined(path: Path) -> bool:
     metadata_path = done_path(path)
     if not metadata_path.exists():
         return False
+    if metadata_path.stat().st_mtime < path.stat().st_mtime:
+        return False
 
     try:
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
@@ -246,8 +328,14 @@ def output_is_combined(path: Path) -> bool:
     return metadata.get("version") == DONE_VERSION
 
 
-def write_done(output_csv: Path) -> None:
-    done_path(output_csv).write_text(json.dumps({"version": DONE_VERSION}) + "\n", encoding="utf-8")
+def write_done(output_csv: Path, row_count: int) -> None:
+    metadata = {
+        "version": DONE_VERSION,
+        "output_csv": output_csv.name,
+        "row_count": row_count,
+        "note": "Checkpoint metadata only. Open the CSV file for processed data.",
+    }
+    done_path(output_csv).write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
 
 
 def source_csv_is_usable(path: Path, url_col: str | None = None, skill_col: str | None = None) -> bool:
@@ -324,7 +412,7 @@ def write_output(aggregated: dict[str, list[str]], output_csv: Path) -> None:
     result.insert(0, "id", range(1, len(result) + 1))
     output_csv.parent.mkdir(parents=True, exist_ok=True)
     result[["id", "job title", "skill"]].to_csv(output_csv, index=False)
-    write_done(output_csv)
+    write_done(output_csv, len(result))
 
 
 def build_combined_jobskill_csv(
