@@ -1,0 +1,16 @@
+{
+  "env": {
+    "ANTHROPIC_AUTH_TOKEN": "sk-cf3699475bf6aa89cf1b7ebd4fd6ba5bd99c002f7e0f3dbf949e176c",
+    "ANTHROPIC_BASE_URL": "https://claudecode.pimath.id.vn/v1",
+    "ANTHROPIC_MODEL": "claude-opus-4-8",
+    "ANTHROPIC_SMALL_FAST_MODEL": "claude-haiku-4-5",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-4-5",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-4-6",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-8",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "claude-opus-4-7"
+  },
+  "permissions": {
+    "defaultMode": "bypassPermissions",
+    "skipDangerousModePermissionPrompt": true
+  }
+}
